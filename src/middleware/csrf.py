@@ -1,11 +1,10 @@
 """CSRF protection middleware using double-submit cookie pattern."""
 
 import secrets
-from http.cookies import SimpleCookie
 
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
 class CSRFMiddleware:
@@ -45,6 +44,7 @@ class CSRFMiddleware:
 
         request = Request(scope, receive)
         csrf_token = request.cookies.get("csrf_token") or secrets.token_urlsafe(32)
+        scope.setdefault("state", {})["csrf_token"] = csrf_token
 
         if request.method in {"POST", "PUT", "DELETE"} and request.url.path not in self.EXEMPT_PATHS:
             body = await request.body()
@@ -56,21 +56,17 @@ class CSRFMiddleware:
                 await response(scope, receive, send)
                 return
 
-            async def receive_with_body() -> dict:
+            async def receive_with_body() -> Message:
                 return {"type": "http.request", "body": body, "more_body": False}
 
             scope["_csrf_receive"] = receive_with_body
             receive = receive_with_body
 
-        cookie = SimpleCookie()
-        cookie["csrf_token"] = csrf_token
-        cookie["csrf_token"]["samesite"] = "Strict"
-        cookie["csrf_token"]["path"] = "/"
-        set_cookie_value = cookie["csrf_token"].OutputString()
+        set_cookie_value = f"csrf_token={csrf_token}; Path=/; SameSite=Lax"
 
-        async def send_with_cookie(message: dict) -> None:
+        async def send_with_cookie(message: Message) -> None:
             if message["type"] == "http.response.start":
-                headers = list(message.get("headers", []))
+                headers: list[tuple[bytes, bytes]] = list(message.get("headers", []))
                 headers.append((b"set-cookie", set_cookie_value.encode()))
                 message = {**message, "headers": headers}
             await send(message)
