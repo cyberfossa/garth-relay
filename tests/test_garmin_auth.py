@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi import FastAPI
@@ -9,8 +10,8 @@ from garth.sso.state import MFAChallenge, MFAState
 
 from src.auth.session import create_jwt
 from src.config import get_config
-from src.routes import garmin_auth as garmin_auth_module
-from src.routes.garmin_auth import create_garmin_auth_router
+from src.routes import connections as connections_module
+from src.routes.connections import create_connections_router
 from src.templates_config import create_templates
 
 
@@ -49,8 +50,18 @@ def app(mock_db, mock_encryptor, mock_garmin_client):
     mock_cls.create_for_user = MagicMock(return_value=mock_garmin_client)
     mock_cls.return_value = mock_garmin_client
 
-    with patch.object(garmin_auth_module, "GarminClient", mock_cls):
-        router = create_garmin_auth_router(templates, mock_db, cfg, mock_encryptor)
+    with patch.object(connections_module, "GarminClient", mock_cls):
+        router = create_connections_router(
+            templates,
+            mock_db,
+            mock_encryptor,
+            cfg.jwt_secret_key,
+            cfg.jwt_algorithm,
+            cfg.google_client_id,
+            cfg.google_client_secret,
+            cfg.google_oauth_redirect_uri,
+            "http://localhost:8080",
+        )
         test_app.include_router(router)
         yield test_app
 
@@ -78,12 +89,12 @@ def _auth(client, token):
 
 class TestGarminConnect:
     def test_requires_auth(self, client):
-        response = client.get("/garmin/connect")
+        response = client.get("/connections/garmin/connect")
         assert response.status_code == 302
 
     def test_renders_form(self, client, auth_token):
         _auth(client, auth_token)
-        response = client.get("/garmin/connect")
+        response = client.get("/connections/garmin/connect")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
@@ -92,7 +103,7 @@ class TestGarminAuth:
     def test_login_success_redirects(self, client, auth_token, mock_garmin_client):
         _auth(client, auth_token)
         response = client.post(
-            "/garmin/auth",
+            "/connections/garmin/auth",
             data={"email": "garmin@example.com", "password": "secret123"},
         )
         assert response.status_code == 302
@@ -101,14 +112,14 @@ class TestGarminAuth:
 
     def test_mfa_required_returns_mfa_form(self, client, auth_token, mock_garmin_client, mock_db):
         _auth(client, auth_token)
-        mock_garmin_client.login.side_effect = Exception("login failed")
+        mock_garmin_client.login.side_effect = ValueError("login failed")
         mfa_json = MFAChallenge(
             MFAState(strategy_name="sms", domain="garmin.com", state={}), {"cookie": "value"}
         ).to_json()
         mock_garmin_client.login_with_mfa.return_value = (mfa_json, "mfa_required")
 
         response = client.post(
-            "/garmin/auth",
+            "/connections/garmin/auth",
             data={"email": "garmin@example.com", "password": "secret123"},
         )
         assert response.status_code == 200
@@ -116,22 +127,22 @@ class TestGarminAuth:
 
     def test_wrong_credentials(self, client, auth_token, mock_garmin_client):
         _auth(client, auth_token)
-        mock_garmin_client.login.side_effect = Exception("Wrong")
-        mock_garmin_client.login_with_mfa.side_effect = Exception("Wrong")
+        mock_garmin_client.login.side_effect = ValueError("Wrong")
+        mock_garmin_client.login_with_mfa.side_effect = RuntimeError("Wrong")
 
         response = client.post(
-            "/garmin/auth",
+            "/connections/garmin/auth",
             data={"email": "wrong@example.com", "password": "wrong"},
         )
         assert response.status_code == 401
 
     def test_empty_credentials_returns_400(self, client, auth_token):
         _auth(client, auth_token)
-        response = client.post("/garmin/auth", data={"email": "", "password": ""})
+        response = client.post("/connections/garmin/auth", data={"email": "", "password": ""})
         assert response.status_code == 400
 
     def test_requires_auth(self, client):
-        response = client.post("/garmin/auth", data={"email": "t@t.com", "password": "p"})
+        response = client.post("/connections/garmin/auth", data={"email": "t@t.com", "password": "p"})
         assert response.status_code == 302
 
 
@@ -143,7 +154,7 @@ class TestGarminMFA:
         ).to_json()
         mock_db.get_mfa_state.return_value = {"encrypted_state": mfa_json}
 
-        response = client.post("/garmin/mfa", data={"mfa_code": "123456"})
+        response = client.post("/connections/garmin/mfa", data={"mfa_code": "123456"})
         assert response.status_code == 302
         assert response.headers["location"] == "/dashboard"
         mock_garmin_client.complete_mfa.assert_awaited_once()
@@ -151,26 +162,26 @@ class TestGarminMFA:
 
     def test_mfa_invalid_code(self, client, auth_token, mock_garmin_client, mock_db):
         _auth(client, auth_token)
-        mock_garmin_client.complete_mfa.side_effect = Exception("Invalid MFA")
+        mock_garmin_client.complete_mfa.side_effect = ValueError("Invalid MFA")
         mfa_json = MFAChallenge(
             MFAState(strategy_name="sms", domain="garmin.com", state={}), {"cookie": "value"}
         ).to_json()
         mock_db.get_mfa_state.return_value = {"encrypted_state": mfa_json}
 
-        response = client.post("/garmin/mfa", data={"mfa_code": "000000"})
+        response = client.post("/connections/garmin/mfa", data={"mfa_code": "000000"})
         assert response.status_code == 401
 
     def test_mfa_expired_state(self, client, auth_token, mock_db):
         _auth(client, auth_token)
         mock_db.get_mfa_state.return_value = None
 
-        response = client.post("/garmin/mfa", data={"mfa_code": "123456"})
+        response = client.post("/connections/garmin/mfa", data={"mfa_code": "123456"})
         assert response.status_code == 400
         assert "expired" in response.text.lower()
 
     def test_mfa_empty_code_returns_400(self, client, auth_token):
         _auth(client, auth_token)
-        response = client.post("/garmin/mfa", data={"mfa_code": ""})
+        response = client.post("/connections/garmin/mfa", data={"mfa_code": ""})
         assert response.status_code == 400
 
 
@@ -179,11 +190,51 @@ class TestGarminDisconnect:
         _auth(client, auth_token)
         mock_db.delete_garmin_session.return_value = True
 
-        response = client.post("/garmin/disconnect")
-        assert response.status_code == 200
-        assert response.headers.get("HX-Trigger") == "connectionsChanged"
+        response = client.post("/connections/garmin/disconnect")
+        assert response.status_code == 302
+        assert response.headers["location"] == "/dashboard"
         mock_db.delete_garmin_session.assert_called_once()
 
     def test_disconnect_requires_auth(self, client):
-        response = client.post("/garmin/disconnect")
+        response = client.post("/connections/garmin/disconnect")
         assert response.status_code == 302
+
+
+class TestGoogleConnectFlow:
+    def test_auth_uses_connections_callback_uri(self, client, auth_token):
+        _auth(client, auth_token)
+        response = client.get("/connections/google/auth")
+        assert response.status_code == 302
+        location = response.headers["location"]
+        assert "/connections/google/callback" in location
+
+    def test_callback_saves_tokens_and_redirects(self, client, auth_token, mock_db):
+        _auth(client, auth_token)
+        response = client.get("/connections/google/auth")
+        state = parse_qs(urlparse(response.headers["location"]).query)["state"][0]
+
+        token_response = MagicMock()
+        token_response.status_code = 200
+        token_response.json.return_value = {
+            "access_token": "google-access",
+            "refresh_token": "google-refresh",
+            "expires_in": 3600,
+        }
+
+        with patch("src.routes.connections.httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(return_value=token_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_class.return_value = mock_client
+
+            callback = client.get(f"/connections/google/callback?code=auth-code&state={state}")
+
+        assert callback.status_code == 302
+        assert callback.headers["location"] == "/dashboard"
+        mock_db.save_oauth_token.assert_called_once()
+
+    def test_callback_rejects_invalid_state(self, client, auth_token):
+        _auth(client, auth_token)
+        response = client.get("/connections/google/callback?code=auth-code&state=bad-state")
+        assert response.status_code == 403

@@ -63,4 +63,3 @@ def jwt_token(config):
         secret=config.jwt_secret_key,
         algorithm=config.jwt_algorithm,
     )
-

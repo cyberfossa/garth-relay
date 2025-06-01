@@ -113,9 +113,9 @@ class TestSave:
         storage.save(token)
 
         saved_data = doc_ref.set.call_args[0][0]
-        assert saved_data["access_token"] == f'v1:{json.dumps(token.access_token)}'
-        assert saved_data["refresh_token"] == f'v1:{json.dumps(token.refresh_token)}'
-        assert saved_data["mfa_token"] == f'v1:{json.dumps(token.mfa_token)}'
+        assert saved_data["access_token"] == f"v1:{json.dumps(token.access_token)}"
+        assert saved_data["refresh_token"] == f"v1:{json.dumps(token.refresh_token)}"
+        assert saved_data["mfa_token"] == f"v1:{json.dumps(token.mfa_token)}"
         assert doc_ref.set.call_args[1] == {"merge": True}
 
     def test_reraises_on_firestore_write_failure(self, storage, doc_ref):
