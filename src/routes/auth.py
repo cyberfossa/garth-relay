@@ -1,6 +1,6 @@
 """Authentication and OAuth2 routes with JWT session cookies."""
 
-import secrets
+from datetime import UTC, datetime, timedelta
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 from src.auth.google_oauth2 import GoogleOAuth2Service, validate_id_token
 from src.auth.session import create_jwt, get_current_user
 from src.config import AppConfig
+from src.db.firestore_client import FirestoreClient
 
 logger = structlog.get_logger()
 
@@ -16,9 +17,10 @@ logger = structlog.get_logger()
 _oauth_states: dict[str, str] = {}
 
 
-def create_auth_router(
+def create_auth_router(  # noqa: C901
     config: AppConfig,
     oauth_service: GoogleOAuth2Service,
+    db_client: FirestoreClient | None = None,
 ) -> APIRouter:
     """Create auth router with OAuth2 login/callback/logout.
 
@@ -67,6 +69,18 @@ def create_auth_router(
             algorithm=config.jwt_algorithm,
         )
 
+        # Persist user profile and Google OAuth tokens for background polling
+        if db_client:
+            db_client.save_user_profile(user_id, email, name)
+            expires_at = datetime.now(UTC) + timedelta(seconds=token_response.expires_in)
+            db_client.save_oauth_token(
+                user_id,
+                "google",
+                token_response.access_token,
+                token_response.refresh_token,
+                expires_at,
+            )
+
         response = RedirectResponse(url="/dashboard", status_code=302)
         response.set_cookie(
             key="session",
@@ -81,7 +95,7 @@ def create_auth_router(
 
     @auth_router.post("/logout")
     async def logout():
-        response = RedirectResponse(url="/auth/login", status_code=302)
+        response = RedirectResponse(url="/login", status_code=302)
         response.delete_cookie(key="session", path="/")
         return response
 

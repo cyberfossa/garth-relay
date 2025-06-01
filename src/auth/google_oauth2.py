@@ -18,7 +18,7 @@ class GoogleOAuth2Config:
     client_id: str
     client_secret: str
     redirect_uri: str
-    scope: str = "openid email profile https://www.googleapis.com/auth/fitness.body.read"
+    scope: str = "openid email profile"
 
 
 @dataclass

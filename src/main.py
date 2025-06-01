@@ -1,31 +1,33 @@
 """FastAPI application for garth-relay."""
 
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import structlog
 from fastapi import FastAPI
 
 from src.auth.google_oauth2 import GoogleOAuth2Config, GoogleOAuth2Service
 from src.config import get_config
-from src.services.google_health_client import GoogleHealthAPIClient
-from src.services.sync_orchestrator import SyncOrchestrator
 from src.crypto import TokenEncryptor
 from src.db import FirestoreClient
 from src.logging_setup import setup_logging
 from src.middleware import CSRFMiddleware, SecurityHeadersMiddleware
 from src.routes.auth import create_auth_router
 from src.routes.bulk_sync import create_bulk_sync_router
-from src.routes.garmin_auth import create_garmin_auth_router
+from src.routes.connections import create_connections_router
 from src.routes.pages import create_pages_router
 from src.routes.polling import create_polling_router
 from src.routes.webhooks import create_webhooks_router
+from src.services.garmin_client import GarminClient
+from src.services.google_health_client import GoogleHealthAPIClient
+from src.services.sync_orchestrator import SyncOrchestrator
 from src.templates_config import create_templates
 
 setup_logging()
 logger = structlog.get_logger()
 
 
-def _create_app() -> FastAPI:
+def _create_app() -> FastAPI:  # noqa: PLR0915
     config = get_config()
 
     @asynccontextmanager
@@ -44,12 +46,18 @@ def _create_app() -> FastAPI:
         _app.state.google_health_client = GoogleHealthAPIClient()
         logger.info("GoogleHealthAPIClient initialized")
 
-        _app.state.sync_orchestrator = SyncOrchestrator(
-            google_client=_app.state.google_health_client,
-            db_client=_app.state.db,
-            encryptor=_app.state.token_encryptor,
-        )
-        logger.info("SyncOrchestrator initialized")
+        _app.state.garmin_client = GarminClient()
+        logger.info("GarminClient initialized")
+
+        if _app.state.db is not None:
+            _app.state.sync_orchestrator = SyncOrchestrator(
+                google_client=_app.state.google_health_client,
+                db_client=_app.state.db,
+                encryptor=_app.state.token_encryptor,
+            )
+            logger.info("SyncOrchestrator initialized")
+        else:
+            _app.state.sync_orchestrator = None
 
         yield
         logger.info("Application shutting down")
@@ -84,31 +92,57 @@ def _create_app() -> FastAPI:
         redirect_uri=config.google_oauth_redirect_uri,
     )
     oauth_service = GoogleOAuth2Service(google_config)
-    auth_router = create_auth_router(config=config, oauth_service=oauth_service)
+    auth_router = create_auth_router(config=config, oauth_service=oauth_service, db_client=db_client)
     application.include_router(auth_router)
 
-    # Garmin auth router
     encryptor = TokenEncryptor(master_key=config.encryption_key)
-    if db_client:
-        garmin_router = create_garmin_auth_router(templates, db_client, config, encryptor)
-        application.include_router(garmin_router)
+    parsed_redirect_uri = urlparse(config.google_oauth_redirect_uri)
+    connections_base_url = (
+        f"{parsed_redirect_uri.scheme}://{parsed_redirect_uri.netloc}" if parsed_redirect_uri.netloc else ""
+    )
+    google_connections_redirect_uri = (
+        f"{connections_base_url}/connections/google/callback"
+        if connections_base_url
+        else config.google_oauth_redirect_uri
+    )
+    sync_orchestrator: SyncOrchestrator | None = None
+
+    # Connections router (Google + Garmin)
+    connections_router = create_connections_router(
+        templates=templates,
+        db_client=db_client,
+        encryptor=encryptor,
+        jwt_secret=config.jwt_secret_key,
+        jwt_algorithm=config.jwt_algorithm,
+        google_client_id=config.google_client_id,
+        google_client_secret=config.google_client_secret,
+        google_redirect_uri=google_connections_redirect_uri,
+        app_base_url=connections_base_url,
+    )
+    application.include_router(connections_router)
 
     # Polling router (Cloud Scheduler + manual sync)
     google_health_client = GoogleHealthAPIClient()
-    sync_orchestrator = SyncOrchestrator(
-        google_client=google_health_client,
-        db_client=db_client,
-        encryptor=encryptor,
-    )
-    polling_router = create_polling_router(
-        db_client=db_client,
-        sync_orchestrator=sync_orchestrator,
-        config=config,
-    )
-    application.include_router(polling_router)
+    if db_client:
+        sync_orchestrator = SyncOrchestrator(
+            google_client=google_health_client,
+            db_client=db_client,
+            encryptor=encryptor,
+        )
+        polling_router = create_polling_router(
+            db_client=db_client,
+            sync_orchestrator=sync_orchestrator,
+            config=config,
+        )
+        application.include_router(polling_router)
 
     # Bulk sync router (auth-gated)
     if db_client:
+        sync_orchestrator = SyncOrchestrator(
+            google_client=google_health_client,
+            db_client=db_client,
+            encryptor=encryptor,
+        )
         bulk_sync_router = create_bulk_sync_router(
             templates=templates,
             db_client=db_client,

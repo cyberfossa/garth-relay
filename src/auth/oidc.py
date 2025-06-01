@@ -19,7 +19,7 @@ async def verify_oidc_token(request: Request, audience: str) -> str:
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing OIDC token")
 
-    token = auth_header[len("Bearer "):]
+    token = auth_header[len("Bearer ") :]
 
     try:
         transport = google_requests.Request()
