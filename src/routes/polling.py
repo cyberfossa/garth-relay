@@ -96,7 +96,7 @@ def _htmx_auth_error(message: str) -> _HtmxAuthError:
     )
 
 
-def create_polling_router(
+def create_polling_router(  # noqa: C901
     db_client: FirestoreClient,
     sync_orchestrator: SyncOrchestrator,
     config: AppConfig,
@@ -123,14 +123,16 @@ def create_polling_router(
                 total=summary.total,
                 duration_seconds=summary.duration_seconds,
             )
-            return JSONResponse({
-                "status": "ok",
-                "synced": summary.synced,
-                "skipped": summary.skipped,
-                "errors": summary.errors,
-                "total": summary.total,
-                "duration_seconds": summary.duration_seconds,
-            })
+            return JSONResponse(
+                {
+                    "status": "ok",
+                    "synced": summary.synced,
+                    "skipped": summary.skipped,
+                    "errors": summary.errors,
+                    "total": summary.total,
+                    "duration_seconds": summary.duration_seconds,
+                }
+            )
         except Exception:
             logger.exception("poll failed")
             return JSONResponse({"status": "error", "detail": "Poll failed"}, status_code=500)

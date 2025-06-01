@@ -5,7 +5,7 @@
 
     <p>Enter the verification code from Garmin Connect to finish linking your account.</p>
 
-    <form hx-post="/garmin/mfa" hx-target="#garmin-auth-area" hx-swap="innerHTML" method="post" action="/garmin/mfa">
+    <form hx-post="/connections/garmin/mfa" hx-target="#garmin-auth-area" hx-swap="innerHTML" hx-disabled-elt="find button" method="post" action="/connections/garmin/mfa">
         {{ csrf_hidden_field(request) | safe }}
         <label for="garmin-mfa-code">MFA code</label>
         <input
@@ -17,6 +17,6 @@
             autocomplete="one-time-code"
             placeholder="123456"
         >
-        <button type="submit">Verify code</button>
+        <button type="submit" onclick="this.setAttribute('aria-busy','true');this.textContent='Verifying...'">Verify code</button>
     </form>
 </article>

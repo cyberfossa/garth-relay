@@ -17,7 +17,7 @@
                         {% if google_connected %}
                         <span style="color: var(--pico-ins-color);">&#10003; Connected</span>
                         <br>
-                        <form hx-post="/auth/disconnect-google-health"
+                        <form hx-post="/connections/google/disconnect"
                               hx-target="#connections-section"
                               hx-swap="innerHTML"
                               hx-confirm="Disconnect Google Health?"
@@ -27,7 +27,7 @@
                         </form>
                         {% else %}
                         <span style="color: var(--pico-del-color);">&#10007; Not connected</span>
-                        <br><a href="/connect-google" role="button" class="outline" style="margin-top: 0.5rem; display: inline-block;">Connect Google Health</a>
+                        <br><a href="/connections/google/connect" role="button" class="outline" style="margin-top: 0.5rem; display: inline-block;">Connect Google Health</a>
                         {% endif %}
                     </li>
                     <li>
@@ -35,7 +35,7 @@
                         {% if garmin_connected %}
                         <span style="color: var(--pico-ins-color);">&#10003; Connected</span>
                         <br>
-                        <form hx-post="/garmin/disconnect"
+                        <form hx-post="/connections/garmin/disconnect"
                               hx-target="#connections-section"
                               hx-swap="innerHTML"
                               hx-confirm="Disconnect Garmin?"
@@ -45,7 +45,7 @@
                         </form>
                         {% else %}
                         <span style="color: var(--pico-del-color);">&#10007; Not connected</span>
-                        <br><a href="/garmin/connect" role="button" class="outline" style="margin-top: 0.5rem; display: inline-block;">Connect Garmin</a>
+                        <br><a href="/connections/garmin/connect" role="button" class="outline" style="margin-top: 0.5rem; display: inline-block;">Connect Garmin</a>
                         {% endif %}
                     </li>
                 </ul>

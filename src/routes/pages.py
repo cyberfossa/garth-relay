@@ -81,17 +81,4 @@ def create_pages_router(
             },
         )
 
-    @pages_router.get("/connect-google")
-    async def connect_google(request: Request):
-        try:
-            await get_current_user(request, config.jwt_secret_key, config.jwt_algorithm)
-        except HTTPException:
-            return RedirectResponse(url="/login", status_code=302)
-
-        return templates.TemplateResponse(
-            request,
-            "connect-google.html",
-            {"request": request, "error_message": None},
-        )
-
     return pages_router
