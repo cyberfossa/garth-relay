@@ -88,7 +88,11 @@ def create_connections_router(  # noqa: C901, PLR0915
         return RedirectResponse(url=auth_url, status_code=302)
 
     @router.get("/google/callback")
-    async def google_callback(code: str, state: str, request: Request):
+    async def google_callback(state: str, request: Request, code: str | None = None, error: str | None = None):
+        if error or not code:
+            _google_oauth_states.pop(state, None)
+            return RedirectResponse(url="/login", status_code=302)
+
         stored_purpose = _google_oauth_states.pop(state, None)
         if stored_purpose != "google_connect":
             raise HTTPException(status_code=403, detail="Invalid or expired state parameter")
@@ -195,7 +199,14 @@ def create_connections_router(  # noqa: C901, PLR0915
             if is_htmx(request):
                 return Response(headers={"HX-Redirect": "/dashboard"})
             return RedirectResponse(url="/dashboard", status_code=302)
-        except (GarthHTTPError, GarminSessionExpiredError, GarminRateLimitError, MFARequiredError, ValueError, RuntimeError):
+        except (
+            GarthHTTPError,
+            GarminSessionExpiredError,
+            GarminRateLimitError,
+            MFARequiredError,
+            ValueError,
+            RuntimeError,
+        ):
             logger.info("Direct Garmin login failed for user %s, trying MFA path", user_id)
 
         try:

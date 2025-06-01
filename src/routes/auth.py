@@ -37,7 +37,11 @@ def create_auth_router(  # noqa: C901
         return RedirectResponse(url=auth_url, status_code=302)
 
     @auth_router.get("/callback")
-    async def callback(code: str, state: str):
+    async def callback(state: str, code: str | None = None, error: str | None = None):
+        if error or not code:
+            _oauth_states.pop(state, None)
+            return RedirectResponse(url="/login", status_code=302)
+
         # Validate state
         stored_purpose = _oauth_states.pop(state, None)
         if stored_purpose != "app_login":
