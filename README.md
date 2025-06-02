@@ -50,3 +50,17 @@ External Source → Google Health API / Webhook
 ## License
 
 MIT
+
+---
+
+## Adding a New Sync Source
+
+The sync pages follow an extensible pattern. Use these steps to add a new health metric source (e.g., blood pressure):
+
+1. **File structure**: Create `src/routes/sync_X.py`, `src/templates/sync-X.html`, and `tests/test_sync_X.py`.
+2. **Router factory**: Implement `create_sync_X_router(db, config, encryptor=None)` in your new route file.
+3. **Shared utilities**: Use `src.routes.sync_common` for `compare_measurements_with_garmin` and `build_sync_table_html`.
+4. **URL pattern**: Register routes under `/sync/{source}` (e.g., `/sync/blood-pressure`).
+5. **Templates**: Extend `base.html` and include `partials/sync-nav.html` for navigation tabs.
+6. **Nav tabs**: Update `src/templates/partials/sync-nav.html` to add a new `<li>` for the source.
+7. **Main registration**: Register the new router in `src/main.py` using the factory pattern.
