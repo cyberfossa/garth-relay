@@ -11,7 +11,7 @@ import httpx
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
-from garth.exc import GarthHTTPError, MFARequiredError
+from garth.exc import GarthHTTPError
 from starlette.templating import Jinja2Templates
 
 from src.crypto import TokenEncryptor
@@ -195,30 +195,22 @@ def create_connections_router(  # noqa: C901, PLR0915
 
         try:
             client = GarminClient.create_for_user(user_id, db_client.db, encryptor)
-            await client.login(email, password)
-            if is_htmx(request):
-                return Response(headers={"HX-Redirect": "/dashboard"})
-            return RedirectResponse(url="/dashboard", status_code=302)
+            mfa_challenge = await client.login(email, password)
+            if mfa_challenge is None:
+                if is_htmx(request):
+                    return Response(headers={"HX-Redirect": "/dashboard"})
+                return RedirectResponse(url="/dashboard", status_code=302)
+
+            mfa_state_json = mfa_challenge.to_json()
+            _ = typed_db.save_mfa_state(user_id, mfa_state_json)
+            return templates.TemplateResponse(request, "garmin-mfa.html", {"request": request})
         except (
             GarthHTTPError,
             GarminSessionExpiredError,
             GarminRateLimitError,
-            MFARequiredError,
             ValueError,
             RuntimeError,
-        ):
-            logger.info("Direct Garmin login failed for user %s, trying MFA path", user_id)
-
-        try:
-            client = GarminClient()
-            mfa_state_json, status = await client.login_with_mfa(email, password)
-            if status != "mfa_required":
-                return HTMLResponse('<p class="error">Unexpected Garmin authentication state.</p>', status_code=500)
-
-            normalized_mfa_state_json = json.dumps(json.loads(mfa_state_json))
-            _ = typed_db.save_mfa_state(user_id, normalized_mfa_state_json)
-            return templates.TemplateResponse(request, "garmin-mfa.html", {"request": request})
-        except (GarthHTTPError, GarminSessionExpiredError, GarminRateLimitError, ValueError, RuntimeError) as exc:
+        ) as exc:
             logger.warning("Garmin authentication failed for user %s: %s", user_id, exc)
             return HTMLResponse(
                 '<p class="error">Invalid Garmin credentials or MFA challenge failed.</p>', status_code=401

@@ -6,10 +6,11 @@ from typing import cast
 
 import garth
 import structlog
+from garth.auth_tokens import OAuth2Token
 from garth.data.weight import WeightData
 from garth.exc import GarthHTTPError
 from garth.http import Client as GarthHttpClient
-from garth.sso.state import MFAChallenge
+from garth.sso.state import MFAChallenge, MFAState
 from google.cloud import firestore
 from structlog.typing import FilteringBoundLogger
 
@@ -41,17 +42,14 @@ class GarminClient:
         client.configure(storage=storage)
         return cls(client, storage)
 
-    async def login(self, email: str, password: str) -> None:
+    async def login(self, email: str, password: str) -> MFAChallenge | None:
         try:
-            _ = await asyncio.to_thread(self._client.login, email, password)
-        except GarthHTTPError as exc:
-            self._raise_mapped_http_error(exc)
-            raise
-
-    async def login_with_mfa(self, email: str, password: str) -> tuple[str, str]:
-        try:
-            challenge = await asyncio.to_thread(self._client.login_mfa_challenge, email, password)
-            return challenge.to_json(), "mfa_required"
+            result: OAuth2Token | MFAState = await asyncio.to_thread(
+                self._client.login, email, password, return_on_mfa=True
+            )
+            if isinstance(result, MFAState):
+                return MFAChallenge(mfa_state=result, cookies=dict(self._client.session.cookies.items()))
+            return None
         except GarthHTTPError as exc:
             self._raise_mapped_http_error(exc)
             raise

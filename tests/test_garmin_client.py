@@ -60,9 +60,14 @@ class TestGarminClientCreation:
 
 class TestLogin:
     async def test_login_success(self, garmin_client, mock_garth_client):
-        mock_garth_client.login = MagicMock(return_value=None)
-        await garmin_client.login("user@example.com", "password")
-        mock_garth_client.login.assert_called_once_with("user@example.com", "password")
+        mock_garth_client.login = MagicMock(return_value=MagicMock(name="OAuth2Token"))
+
+        result = await garmin_client.login("user@example.com", "password")
+
+        assert result is None
+        mock_garth_client.login.assert_called_once_with(
+            "user@example.com", "password", return_on_mfa=True
+        )
 
     async def test_login_401_raises_session_expired(self, garmin_client, mock_garth_client):
         mock_garth_client.login = MagicMock(side_effect=_make_garth_http_error(401))
@@ -75,20 +80,28 @@ class TestLogin:
             await garmin_client.login("user@example.com", "password")
 
 
-class TestLoginWithMFA:
-    async def test_returns_mfa_payload(self, garmin_client, mock_garth_client):
+class TestLoginMFA:
+    async def test_returns_mfa_challenge(self, garmin_client, mock_garth_client):
         mock_mfa_state = MFAState(strategy_name="sms", domain="garmin.com", state={"key": "val"})
         mock_challenge = MFAChallenge(mock_mfa_state, {"GARMIN-SSO": "cookie-value"})
-        mock_garth_client.login_mfa_challenge = MagicMock(return_value=mock_challenge)
+        mock_garth_client.login = MagicMock(return_value=mock_mfa_state)
+        garmin_client._client.session.cookies = MagicMock(
+            items=MagicMock(return_value={"GARMIN-SSO": "cookie-value"}.items())
+        )
 
-        payload_json, status = await garmin_client.login_with_mfa("user@example.com", "password")
-        assert status == "mfa_required"
-        assert "mfa_state" in payload_json
+        result = await garmin_client.login("user@example.com", "password")
+
+        assert result == mock_challenge
+        mock_garth_client.login.assert_called_once_with(
+            "user@example.com", "password", return_on_mfa=True
+        )
 
     async def test_http_error_raises(self, garmin_client, mock_garth_client):
-        mock_garth_client.login_mfa_challenge = MagicMock(side_effect=_make_garth_http_error(429))
+        mock_garth_client.login = MagicMock(side_effect=_make_garth_http_error(429))
+        garmin_client._client.session.cookies = MagicMock(items=MagicMock(return_value={}.items()))
+
         with pytest.raises(GarminRateLimitError):
-            await garmin_client.login_with_mfa("user@example.com", "password")
+            await garmin_client.login("user@example.com", "password")
 
 
 class TestCompleteMFA:

@@ -47,7 +47,6 @@ def fake_firestore_client():
 def fake_garmin_client():
     client = AsyncMock()
     client.login = AsyncMock(return_value=None)
-    client.login_with_mfa = AsyncMock(return_value=('{"mfa_state":{}}', "mfa_required"))
     client.complete_mfa = AsyncMock(return_value=None)
     client.upload_body_composition = AsyncMock(return_value=None)
     client.fetch_existing_weights = AsyncMock(return_value=[])

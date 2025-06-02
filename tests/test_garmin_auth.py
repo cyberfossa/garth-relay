@@ -35,7 +35,6 @@ def mock_encryptor():
 def mock_garmin_client():
     client = MagicMock()
     client.login = AsyncMock(return_value=None)
-    client.login_with_mfa = AsyncMock()
     client.complete_mfa = AsyncMock(return_value=None)
     return client
 
@@ -112,11 +111,10 @@ class TestGarminAuth:
 
     def test_mfa_required_returns_mfa_form(self, client, auth_token, mock_garmin_client, mock_db):
         _auth(client, auth_token)
-        mock_garmin_client.login.side_effect = ValueError("login failed")
-        mfa_json = MFAChallenge(
+        mfa_challenge = MFAChallenge(
             MFAState(strategy_name="sms", domain="garmin.com", state={}), {"cookie": "value"}
-        ).to_json()
-        mock_garmin_client.login_with_mfa.return_value = (mfa_json, "mfa_required")
+        )
+        mock_garmin_client.login.return_value = mfa_challenge
 
         response = client.post(
             "/connections/garmin/auth",
@@ -124,11 +122,11 @@ class TestGarminAuth:
         )
         assert response.status_code == 200
         mock_db.save_mfa_state.assert_called_once()
+        mock_garmin_client.login.assert_awaited_once()
 
     def test_wrong_credentials(self, client, auth_token, mock_garmin_client):
         _auth(client, auth_token)
         mock_garmin_client.login.side_effect = ValueError("Wrong")
-        mock_garmin_client.login_with_mfa.side_effect = RuntimeError("Wrong")
 
         response = client.post(
             "/connections/garmin/auth",
