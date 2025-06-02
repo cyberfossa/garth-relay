@@ -316,6 +316,9 @@ async def _compare_with_garmin(
     garmin_session = db_client.has_garmin_session(user_id)
     if not garmin_session:
         return _GARMIN_EXPIRED_HTML, None
+    if encryptor is None:
+        logger.warning("Garmin sync comparison unavailable for user %s: missing encryptor", user_id)
+        return _GARMIN_EXPIRED_HTML, None
 
     try:
         client = GarminClient.create_for_user(user_id, db_client.db, encryptor)
@@ -323,6 +326,12 @@ async def _compare_with_garmin(
     except GarminSessionExpiredError:
         logger.warning("Garmin session expired for user %s during sync-weight comparison", user_id)
         return _GARMIN_EXPIRED_HTML, None
+    except GarminRateLimitError:
+        logger.warning("Garmin rate limited during sync-weight comparison for user %s", user_id)
+        return (
+            '<p style="color: var(--pico-color-yellow-450);">'
+            "⚠️ Garmin is temporarily rate limited — sync status is unavailable.</p>"
+        ), None
 
     synced_flags = compare_measurements_with_garmin(measurements, garmin_weights, tolerance_minutes=5)
     return "", synced_flags

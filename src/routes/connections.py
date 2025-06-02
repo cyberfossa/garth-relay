@@ -18,6 +18,7 @@ from src.crypto import TokenEncryptor
 from src.db.firestore_client import FirestoreClient
 from src.routes.connections_helpers import is_htmx, require_user
 from src.services.garmin_client import GarminClient, GarminRateLimitError, GarminSessionExpiredError
+from src.services.google_health_client import GOOGLE_HEALTH_SCOPE
 
 logger = structlog.get_logger()
 
@@ -74,7 +75,7 @@ def create_connections_router(  # noqa: C901, PLR0915
         state = secrets.token_urlsafe(32)
         _google_oauth_states[state] = "google_connect"
 
-        scopes = "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"
+        scopes = GOOGLE_HEALTH_SCOPE
         auth_url = (
             "https://accounts.google.com/o/oauth2/v2/auth"
             f"?client_id={google_client_id}"
