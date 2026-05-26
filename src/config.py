@@ -9,6 +9,7 @@ class AppConfig:
 
     debug: bool = environ.bool_var(default=False)
     log_level: str = environ.var(default="INFO")
+    gcp_project_id: str = environ.var(default="")
 
 
 def get_config() -> AppConfig:
