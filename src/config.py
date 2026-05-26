@@ -10,6 +10,7 @@ logger = structlog.get_logger()
 
 _DEV_ENCRYPTION_KEY = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode()
 _DEV_JWT_SECRET = "garth-relay-dev-jwt-secret-CHANGE-ME"
+_DEV_CSRF_SECRET = "garth-relay-dev-csrf-secret-CHANGE-ME"
 
 
 @environ.config(prefix="APP")
@@ -22,6 +23,7 @@ class AppConfig:
     encryption_key: str = environ.var(default="")
     jwt_secret_key: str = environ.var(default="")
     jwt_algorithm: str = environ.var(default="HS256")
+    csrf_secret: str = environ.var(default="")
 
 
 def get_config() -> AppConfig:
@@ -39,5 +41,9 @@ def get_config() -> AppConfig:
     if not config.jwt_secret_key:
         logger.warning("APP_JWT_SECRET_KEY not set, using dev default (NOT for production)")
         object.__setattr__(config, "jwt_secret_key", _DEV_JWT_SECRET)
+
+    if not config.csrf_secret:
+        logger.warning("APP_CSRF_SECRET not set, using dev default (NOT for production)")
+        object.__setattr__(config, "csrf_secret", _DEV_CSRF_SECRET)
 
     return config
