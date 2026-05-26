@@ -6,6 +6,7 @@ import structlog
 from fastapi import FastAPI
 
 from src.config import get_config
+from src.crypto import TokenEncryptor
 from src.db import FirestoreClient
 from src.logging_setup import setup_logging
 
@@ -25,6 +26,10 @@ def _create_app() -> FastAPI:
         else:
             _app.state.db = None
             logger.warning("No GCP project ID configured, Firestore disabled")
+
+        _app.state.token_encryptor = TokenEncryptor(master_key=config.encryption_key)
+        logger.info("TokenEncryptor initialized")
+
         yield
         logger.info("Application shutting down")
 
