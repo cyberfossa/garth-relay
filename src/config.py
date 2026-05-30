@@ -24,6 +24,9 @@ class AppConfig:
     jwt_secret_key: str = environ.var(default="")
     jwt_algorithm: str = environ.var(default="HS256")
     csrf_secret: str = environ.var(default="")
+    google_client_id: str = environ.var(default="")
+    google_client_secret: str = environ.var(default="")
+    google_oauth_redirect_uri: str = environ.var(default="http://localhost:8080/auth/callback")
 
 
 def get_config() -> AppConfig:
