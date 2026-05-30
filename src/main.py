@@ -5,11 +5,13 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
+from src.auth.google_oauth2 import GoogleOAuth2Config, GoogleOAuth2Service
 from src.config import get_config
 from src.crypto import TokenEncryptor
 from src.db import FirestoreClient
 from src.logging_setup import setup_logging
 from src.middleware import CSRFMiddleware, SecurityHeadersMiddleware
+from src.routes.auth import create_auth_router
 from src.routes.pages import create_pages_router
 from src.templates_config import create_templates
 
@@ -59,6 +61,15 @@ def _create_app() -> FastAPI:
 
     pages_router = create_pages_router(templates, db_client, config)
     application.include_router(pages_router)
+
+    google_config = GoogleOAuth2Config(
+        client_id=config.google_client_id,
+        client_secret=config.google_client_secret,
+        redirect_uri=config.google_oauth_redirect_uri,
+    )
+    oauth_service = GoogleOAuth2Service(google_config)
+    auth_router = create_auth_router(config=config, oauth_service=oauth_service)
+    application.include_router(auth_router)
 
     return application
 
