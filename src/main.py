@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from src.auth.google_oauth2 import GoogleOAuth2Config, GoogleOAuth2Service
 from src.config import get_config
+from src.services.google_health_client import GoogleHealthAPIClient
 from src.crypto import TokenEncryptor
 from src.db import FirestoreClient
 from src.logging_setup import setup_logging
@@ -34,6 +35,9 @@ def _create_app() -> FastAPI:
 
         _app.state.token_encryptor = TokenEncryptor(master_key=config.encryption_key)
         logger.info("TokenEncryptor initialized")
+
+        _app.state.google_health_client = GoogleHealthAPIClient()
+        logger.info("GoogleHealthAPIClient initialized")
 
         yield
         logger.info("Application shutting down")
