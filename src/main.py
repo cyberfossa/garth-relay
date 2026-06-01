@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from src.auth.google_oauth2 import GoogleOAuth2Config, GoogleOAuth2Service
 from src.config import get_config
 from src.services.google_health_client import GoogleHealthAPIClient
+from src.services.sync_orchestrator import SyncOrchestrator
 from src.crypto import TokenEncryptor
 from src.db import FirestoreClient
 from src.logging_setup import setup_logging
@@ -39,6 +40,13 @@ def _create_app() -> FastAPI:
 
         _app.state.google_health_client = GoogleHealthAPIClient()
         logger.info("GoogleHealthAPIClient initialized")
+
+        _app.state.sync_orchestrator = SyncOrchestrator(
+            google_client=_app.state.google_health_client,
+            db_client=_app.state.db,
+            encryptor=_app.state.token_encryptor,
+        )
+        logger.info("SyncOrchestrator initialized")
 
         yield
         logger.info("Application shutting down")

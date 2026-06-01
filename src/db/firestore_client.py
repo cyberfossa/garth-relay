@@ -7,6 +7,7 @@ import structlog
 from google.cloud import firestore
 
 from src.models.firestore_models import UserProfile
+from src.models.oauth_models import OAuthToken
 
 logger = structlog.get_logger()
 
@@ -189,6 +190,51 @@ class FirestoreClient:
             return doc.exists
         except Exception:
             logger.exception("Failed to check Garmin session", user_id=user_id)
+            return False
+
+    def get_oauth_token(self, user_id: str, provider: str) -> OAuthToken | None:
+        try:
+            doc = cast(
+                firestore.DocumentSnapshot,
+                self._user_ref(user_id).collection("oauth_tokens").document(provider).get(),
+            )
+            if not doc.exists:
+                return None
+            data = cast(dict[str, Any], doc.to_dict())
+            return OAuthToken(
+                user_id=user_id,
+                provider=provider,
+                access_token=data.get("access_token", ""),
+                refresh_token=data.get("refresh_token"),
+                expires_at=data.get("expires_at", datetime.now(UTC)),
+                created_at=data.get("created_at", datetime.now(UTC)),
+                updated_at=data.get("updated_at", datetime.now(UTC)),
+            )
+        except Exception:
+            logger.exception("Failed to get OAuth token", user_id=user_id, provider=provider)
+            return None
+
+    def save_oauth_token(
+        self,
+        user_id: str,
+        provider: str,
+        access_token: str,
+        refresh_token: str | None,
+        expires_at: datetime,
+    ) -> bool:
+        try:
+            self._user_ref(user_id).collection("oauth_tokens").document(provider).set(
+                {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_at": expires_at,
+                    "updated_at": datetime.now(UTC),
+                },
+                merge=True,
+            )
+            return True
+        except Exception:
+            logger.exception("Failed to save OAuth token", user_id=user_id, provider=provider)
             return False
 
     def get_recent_poll_logs(self, limit: int = 10) -> list[dict[str, Any]]:
