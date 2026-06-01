@@ -27,6 +27,8 @@ class AppConfig:
     google_client_id: str = environ.var(default="")
     google_client_secret: str = environ.var(default="")
     google_oauth_redirect_uri: str = environ.var(default="http://localhost:8080/auth/callback")
+    polling_interval_hours: int = environ.var(default=1, converter=int)
+    polling_enabled: bool = environ.bool_var(default=True)
 
 
 def get_config() -> AppConfig:
