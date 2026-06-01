@@ -6,8 +6,12 @@ import structlog
 from fastapi import FastAPI
 
 from src.config import get_config
+from src.crypto import TokenEncryptor
 from src.db import FirestoreClient
 from src.logging_setup import setup_logging
+from src.middleware import CSRFMiddleware, SecurityHeadersMiddleware
+from src.routes.pages import create_pages_router
+from src.templates_config import create_templates
 
 setup_logging()
 logger = structlog.get_logger()
@@ -25,6 +29,10 @@ def _create_app() -> FastAPI:
         else:
             _app.state.db = None
             logger.warning("No GCP project ID configured, Firestore disabled")
+
+        _app.state.token_encryptor = TokenEncryptor(master_key=config.encryption_key)
+        logger.info("TokenEncryptor initialized")
+
         yield
         logger.info("Application shutting down")
 
@@ -35,9 +43,22 @@ def _create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Middleware (order: security first, then CSRF)
+    application.add_middleware(SecurityHeadersMiddleware)
+    application.add_middleware(CSRFMiddleware)
+
     @application.get("/health")
     async def health_check():
         return {"status": "ok"}
+
+    # Pages router
+    templates = create_templates()
+    db_client = None
+    if config.gcp_project_id:
+        db_client = FirestoreClient(project_id=config.gcp_project_id)
+
+    pages_router = create_pages_router(templates, db_client, config)
+    application.include_router(pages_router)
 
     return application
 

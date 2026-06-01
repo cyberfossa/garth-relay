@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Garth Relay</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body hx-boost="true">
+    <header class="container">
+        <nav>
+            <ul>
+                <li><strong><a href="/" class="contrast">Garth Relay</a></strong></li>
+            </ul>
+            {% if request.cookies.get("session") %}
+            <ul>
+                <li>
+                    <form action="/auth/logout" method="post" style="margin-bottom: 0;">
+                        {{ csrf_hidden_field(request) | safe }}
+                        <button type="submit" class="outline" style="padding: 0.25rem 0.5rem; border: none;">Sign Out</button>
+                    </form>
+                </li>
+            </ul>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main class="container">
+        {% if error_message %}
+        <article style="border-color: var(--pico-del-color);">
+            <p style="color: var(--pico-del-color); margin: 0;">{{ error_message }}</p>
+        </article>
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="container">
+        <hr>
+        <small>Garth Relay - Health Metrics to Garmin Connect</small>
+    </footer>
+</body>
+</html>

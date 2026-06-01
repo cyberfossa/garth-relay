@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Connect Google Health</h2>
+    </header>
+    <p>Garth Relay needs access to your Google Health data to read measurements from your Fitbit scale.</p>
+    <p>We only request read access to body measurements (weight, body fat percentage) and will never share your data with third parties.</p>
+    
+    <footer>
+        <a href="/auth/connect-google-health" role="button" hx-boost="false">Grant Access to Google Health</a>
+    </footer>
+</article>
+{% endblock %}

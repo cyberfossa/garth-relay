@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article style="border-color: var(--pico-del-color);">
+    <header style="background-color: var(--pico-del-color); color: var(--pico-primary-inverse);">
+        <h2>Error</h2>
+    </header>
+    <p>{{ error_message if error_message else "An unexpected error occurred." }}</p>
+    <footer>
+        <a href="/" role="button" class="outline">Go Back Home</a>
+    </footer>
+</article>
+{% endblock %}
