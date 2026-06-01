@@ -13,6 +13,7 @@ from src.db import FirestoreClient
 from src.logging_setup import setup_logging
 from src.middleware import CSRFMiddleware, SecurityHeadersMiddleware
 from src.routes.auth import create_auth_router
+from src.routes.garmin_auth import create_garmin_auth_router
 from src.routes.pages import create_pages_router
 from src.templates_config import create_templates
 
@@ -74,6 +75,12 @@ def _create_app() -> FastAPI:
     oauth_service = GoogleOAuth2Service(google_config)
     auth_router = create_auth_router(config=config, oauth_service=oauth_service)
     application.include_router(auth_router)
+
+    # Garmin auth router
+    encryptor = TokenEncryptor(master_key=config.encryption_key)
+    if db_client:
+        garmin_router = create_garmin_auth_router(templates, db_client, config, encryptor)
+        application.include_router(garmin_router)
 
     return application
 

@@ -140,6 +140,57 @@ class FirestoreClient:
             logger.exception("Failed to log poll run")
             return False
 
+    def save_mfa_state(self, user_id: str, encrypted_state: str, expires_at: datetime | None = None) -> bool:
+        try:
+            data: dict[str, Any] = {
+                "encrypted_state": encrypted_state,
+                "created_at": datetime.now(UTC),
+            }
+            if expires_at:
+                data["expires_at"] = expires_at
+            self._user_ref(user_id).collection("mfa_state").document("current").set(data)
+            logger.info("Saved MFA state", user_id=user_id)
+            return True
+        except Exception:
+            logger.exception("Failed to save MFA state", user_id=user_id)
+            return False
+
+    def get_mfa_state(self, user_id: str) -> dict[str, Any] | None:
+        try:
+            doc = cast(firestore.DocumentSnapshot, self._user_ref(user_id).collection("mfa_state").document("current").get())
+            if not doc.exists:
+                return None
+            return cast(dict[str, Any], doc.to_dict() or {})
+        except Exception:
+            logger.exception("Failed to get MFA state", user_id=user_id)
+            return None
+
+    def delete_mfa_state(self, user_id: str) -> bool:
+        try:
+            self._user_ref(user_id).collection("mfa_state").document("current").delete()
+            logger.info("Deleted MFA state", user_id=user_id)
+            return True
+        except Exception:
+            logger.exception("Failed to delete MFA state", user_id=user_id)
+            return False
+
+    def delete_garmin_session(self, user_id: str) -> bool:
+        try:
+            self._user_ref(user_id).collection("oauth_tokens").document("garmin").delete()
+            logger.info("Deleted Garmin session", user_id=user_id)
+            return True
+        except Exception:
+            logger.exception("Failed to delete Garmin session", user_id=user_id)
+            return False
+
+    def has_garmin_session(self, user_id: str) -> bool:
+        try:
+            doc = cast(firestore.DocumentSnapshot, self._user_ref(user_id).collection("oauth_tokens").document("garmin").get())
+            return doc.exists
+        except Exception:
+            logger.exception("Failed to check Garmin session", user_id=user_id)
+            return False
+
     def get_recent_poll_logs(self, limit: int = 10) -> list[dict[str, Any]]:
         try:
             docs = (
