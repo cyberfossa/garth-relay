@@ -27,6 +27,7 @@ dependencies = [
     "google-auth>=2.29",
     "google-auth-oauthlib>=1.2",
     "httpx>=0.28",
+    "garth-ng @ git+https://github.com/cyberfossa/garth-ng.git@main",
 ]
 
 [project.optional-dependencies]
