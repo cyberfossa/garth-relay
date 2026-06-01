@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Manual Sync</h2>
+        <p>Manually sync multiple measurements from Google Health to Garmin Connect.</p>
+    </header>
+
+    {% if not google_connected or not garmin_connected %}
+    <article style="border-color: var(--pico-del-color);">
+        <p style="color: var(--pico-del-color); margin: 0;">
+            {% if not google_connected %}
+            ❌ Google Health not connected.
+            {% endif %}
+            {% if not garmin_connected %}
+            ❌ Garmin Connect not connected.
+            {% endif %}
+            <br>
+            <a href="/dashboard" role="button" class="outline" style="margin-top: 0.5rem; display: inline-block;">
+                Connect Services
+            </a>
+        </p>
+    </article>
+    {% else %}
+    <section>
+        <h3>Measurements</h3>
+        <div id="measurements-table" hx-get="/bulk-sync/measurements" hx-trigger="load" hx-target="#measurements-table">
+            <p>Loading measurements...</p>
+        </div>
+    </section>
+    {% endif %}
+</article>
+{% endblock %}

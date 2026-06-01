@@ -14,8 +14,11 @@ from src.db import FirestoreClient
 from src.logging_setup import setup_logging
 from src.middleware import CSRFMiddleware, SecurityHeadersMiddleware
 from src.routes.auth import create_auth_router
+from src.routes.bulk_sync import create_bulk_sync_router
 from src.routes.garmin_auth import create_garmin_auth_router
 from src.routes.pages import create_pages_router
+from src.routes.polling import create_polling_router
+from src.routes.webhooks import create_webhooks_router
 from src.templates_config import create_templates
 
 setup_logging()
@@ -89,6 +92,38 @@ def _create_app() -> FastAPI:
     if db_client:
         garmin_router = create_garmin_auth_router(templates, db_client, config, encryptor)
         application.include_router(garmin_router)
+
+    # Polling router (Cloud Scheduler + manual sync)
+    google_health_client = GoogleHealthAPIClient()
+    sync_orchestrator = SyncOrchestrator(
+        google_client=google_health_client,
+        db_client=db_client,
+        encryptor=encryptor,
+    )
+    polling_router = create_polling_router(
+        db_client=db_client,
+        sync_orchestrator=sync_orchestrator,
+        config=config,
+    )
+    application.include_router(polling_router)
+
+    # Bulk sync router (auth-gated)
+    if db_client:
+        bulk_sync_router = create_bulk_sync_router(
+            templates=templates,
+            db_client=db_client,
+            google_client=google_health_client,
+            garmin_client=None,
+            sync_orchestrator=sync_orchestrator,
+            oauth_service=oauth_service,
+            config=config,
+            encryptor=encryptor,
+        )
+        application.include_router(bulk_sync_router)
+
+    # Webhooks router (stub, CSRF exempt)
+    webhooks_router = create_webhooks_router()
+    application.include_router(webhooks_router)
 
     return application
 
