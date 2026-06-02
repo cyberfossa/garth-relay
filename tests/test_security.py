@@ -99,7 +99,7 @@ class TestCSRFProtection:
             v for k, v in response.headers.multi_items() if k.lower() == "set-cookie" and "csrf_token" in v
         ]
         assert len(set_cookie_headers) >= 1
-        assert "samesite=strict" in set_cookie_headers[0].lower()
+        assert "samesite=lax" in set_cookie_headers[0].lower()
 
 
 class TestSecurityHeaders:

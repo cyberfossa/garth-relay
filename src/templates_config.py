@@ -18,8 +18,8 @@ def create_templates(directory: str = "src/templates") -> Jinja2Templates:
     templates.env.undefined = StrictUndefined
 
     def csrf_hidden_field(request: Request) -> str:
-        token = request.cookies.get("csrf_token", "")
+        token = getattr(request.state, "csrf_token", "") or request.cookies.get("csrf_token", "")
         return f'<input type="hidden" name="csrf_token" value="{token}">'
 
-    templates.env.globals["csrf_hidden_field"] = csrf_hidden_field
+    templates.env.globals["csrf_hidden_field"] = csrf_hidden_field  # pyright: ignore[reportArgumentType]
     return templates

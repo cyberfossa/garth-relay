@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from src.auth.session import create_jwt
 from src.config import get_config
+from src.routes.connections import create_connections_router
 from src.routes.pages import create_pages_router
 from src.templates_config import create_templates
 
@@ -21,12 +22,29 @@ def mock_db():
 
 
 @pytest.fixture
-def pages_app(mock_db):
+def mock_encryptor():
+    return MagicMock()
+
+
+@pytest.fixture
+def pages_app(mock_db, mock_encryptor):
     cfg = get_config()
     templates = create_templates()
     app = FastAPI()
     router = create_pages_router(templates, mock_db, cfg)
     app.include_router(router)
+    connections_router = create_connections_router(
+        templates,
+        mock_db,
+        mock_encryptor,
+        cfg.jwt_secret_key,
+        cfg.jwt_algorithm,
+        cfg.google_client_id,
+        cfg.google_client_secret,
+        cfg.google_oauth_redirect_uri,
+        "",
+    )
+    app.include_router(connections_router)
     return app
 
 
@@ -88,10 +106,10 @@ class TestRootRedirect:
 
 class TestConnectGoogle:
     def test_requires_auth(self, client):
-        response = client.get("/connect-google")
+        response = client.get("/connections/google/connect")
         assert response.status_code == 302
 
     def test_renders_with_auth(self, client, auth_token):
         client.cookies.set("session", auth_token)
-        response = client.get("/connect-google")
+        response = client.get("/connections/google/connect")
         assert response.status_code == 200

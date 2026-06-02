@@ -1,14 +1,14 @@
+import urllib.parse
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
-import urllib.parse
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from jose import jwt
 
 from src.auth.google_oauth2 import GoogleOAuth2Config, GoogleOAuth2Service
-from src.auth.session import create_jwt, decode_jwt, set_session_cookie, clear_session_cookie
+from src.auth.session import clear_session_cookie, create_jwt, decode_jwt, get_current_user, set_session_cookie
 from src.config import get_config
 from src.routes.auth import create_auth_router
 
@@ -59,8 +59,6 @@ class TestJWT:
 
 class TestCookieUtilities:
     def test_set_session_cookie_secure_in_production(self):
-        from unittest.mock import MagicMock
-
         response = MagicMock()
         set_session_cookie(response, "token123", debug=False)
         response.set_cookie.assert_called_once_with(
@@ -73,8 +71,6 @@ class TestCookieUtilities:
         )
 
     def test_set_session_cookie_insecure_in_debug(self):
-        from unittest.mock import MagicMock
-
         response = MagicMock()
         set_session_cookie(response, "token123", debug=True)
         response.set_cookie.assert_called_once_with(
@@ -87,8 +83,6 @@ class TestCookieUtilities:
         )
 
     def test_clear_session_cookie(self):
-        from unittest.mock import MagicMock
-
         response = MagicMock()
         clear_session_cookie(response, debug=False)
         response.delete_cookie.assert_called_once_with(
@@ -102,12 +96,6 @@ class TestCookieUtilities:
 class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_no_cookie_raises_redirect(self):
-        from unittest.mock import MagicMock
-
-        from fastapi import HTTPException
-
-        from src.auth.session import get_current_user
-
         request = MagicMock()
         request.cookies = {}
         with pytest.raises(HTTPException) as exc_info:
@@ -116,10 +104,6 @@ class TestGetCurrentUser:
 
     @pytest.mark.asyncio
     async def test_valid_cookie_returns_user_id(self):
-        from unittest.mock import MagicMock
-
-        from src.auth.session import get_current_user
-
         secret = "test-secret"
         token = create_jwt(user_id="user-42", email="e@x.com", name="N", secret=secret)
         request = MagicMock()
@@ -129,12 +113,6 @@ class TestGetCurrentUser:
 
     @pytest.mark.asyncio
     async def test_invalid_cookie_raises_redirect(self):
-        from unittest.mock import MagicMock
-
-        from fastapi import HTTPException
-
-        from src.auth.session import get_current_user
-
         request = MagicMock()
         request.cookies = {"session": "invalid-token"}
         with pytest.raises(HTTPException) as exc_info:
@@ -164,7 +142,7 @@ def mock_oauth_service():
 def auth_app(mock_oauth_service):
     cfg = get_config()
     app = FastAPI()
-    router = create_auth_router(config=cfg, oauth_service=mock_oauth_service)
+    router = create_auth_router(config=cfg, oauth_service=mock_oauth_service, db_client=None)
     app.include_router(router)
     return app
 
@@ -240,7 +218,7 @@ class TestLogout:
         auth_client.cookies.set("session", token)
         response = auth_client.post("/auth/logout")
         assert response.status_code == 302
-        assert "/auth/login" in response.headers["location"]
+        assert "/login" in response.headers["location"]
 
 
 class TestAuthStatus:

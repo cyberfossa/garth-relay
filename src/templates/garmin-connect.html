@@ -9,7 +9,7 @@
     <p>Enter your Garmin Connect credentials to link your account. Credentials are used only for login and are never stored.</p>
 
     <div id="garmin-auth-area">
-        <form hx-post="/garmin/auth" hx-target="#garmin-auth-area" hx-swap="innerHTML" method="post" action="/garmin/auth">
+        <form hx-post="/connections/garmin/auth" hx-target="#garmin-auth-area" hx-swap="innerHTML" hx-disabled-elt="find button" method="post" action="/connections/garmin/auth">
             {{ csrf_hidden_field(request) | safe }}
             <label for="garmin-email">Email</label>
             <input id="garmin-email" type="email" name="email" required placeholder="garmin@example.com" autocomplete="username">
@@ -17,7 +17,7 @@
             <label for="garmin-password">Password</label>
             <input id="garmin-password" type="password" name="password" required autocomplete="current-password">
 
-            <button type="submit">Connect Garmin</button>
+            <button type="submit" onclick="this.setAttribute('aria-busy','true');this.textContent='Connecting...'">Connect Garmin</button>
         </form>
     </div>
 </article>

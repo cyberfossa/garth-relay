@@ -1,3 +1,4 @@
+import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,12 +8,8 @@ from httpx import ASGITransport, AsyncClient
 @pytest.fixture
 async def client():
     with patch("src.db.firestore_client.firestore.Client", return_value=MagicMock()):
-        from importlib import reload
-
-        import src.main
-
-        reload(src.main)
-        async with AsyncClient(transport=ASGITransport(app=src.main.app), base_url="http://test") as ac:
+        main_module = importlib.import_module("src.main")
+        async with AsyncClient(transport=ASGITransport(app=main_module.app), base_url="http://test") as ac:
             yield ac
 
 

@@ -158,7 +158,9 @@ class FirestoreClient:
 
     def get_mfa_state(self, user_id: str) -> dict[str, Any] | None:
         try:
-            doc = cast(firestore.DocumentSnapshot, self._user_ref(user_id).collection("mfa_state").document("current").get())
+            doc = cast(
+                firestore.DocumentSnapshot, self._user_ref(user_id).collection("mfa_state").document("current").get()
+            )
             if not doc.exists:
                 return None
             return cast(dict[str, Any], doc.to_dict() or {})
@@ -186,7 +188,9 @@ class FirestoreClient:
 
     def has_garmin_session(self, user_id: str) -> bool:
         try:
-            doc = cast(firestore.DocumentSnapshot, self._user_ref(user_id).collection("oauth_tokens").document("garmin").get())
+            doc = cast(
+                firestore.DocumentSnapshot, self._user_ref(user_id).collection("oauth_tokens").document("garmin").get()
+            )
             return doc.exists
         except Exception:
             logger.exception("Failed to check Garmin session", user_id=user_id)
@@ -235,6 +239,15 @@ class FirestoreClient:
             return True
         except Exception:
             logger.exception("Failed to save OAuth token", user_id=user_id, provider=provider)
+            return False
+
+    def delete_oauth_token(self, user_id: str, provider: str) -> bool:
+        try:
+            self._user_ref(user_id).collection("oauth_tokens").document(provider).delete()
+            logger.info("Deleted OAuth token", user_id=user_id, provider=provider)
+            return True
+        except Exception:
+            logger.exception("Failed to delete OAuth token", user_id=user_id, provider=provider)
             return False
 
     def get_recent_poll_logs(self, limit: int = 10) -> list[dict[str, Any]]:
