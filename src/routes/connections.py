@@ -74,7 +74,7 @@ def create_connections_router(  # noqa: C901, PLR0915
         state = secrets.token_urlsafe(32)
         _google_oauth_states[state] = "google_connect"
 
-        scopes = "https://www.googleapis.com/auth/fitness.body.read"
+        scopes = "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"
         auth_url = (
             "https://accounts.google.com/o/oauth2/v2/auth"
             f"?client_id={google_client_id}"
