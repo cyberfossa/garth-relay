@@ -59,6 +59,9 @@
                 {{ csrf_hidden_field(request) | safe }}
                 <button type="submit">Sync Now</button>
             </form>
+            <p style="margin-top: 0.75rem;">
+                <a href="/sync/weight" role="button" class="secondary outline">Manual Sync</a>
+            </p>
             <div id="sync-spinner" class="htmx-indicator" style="margin-top: 1rem;">
                 <p>Syncing data... Please wait.</p>
             </div>
