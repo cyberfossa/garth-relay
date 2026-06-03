@@ -1,5 +1,7 @@
 """Tests for bulk sync routes."""
 
+# pyright: reportUnknownParameterType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportPrivateLocalImportUsage=false, reportCallIssue=false
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -9,12 +11,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import src.routes.bulk_sync as bulk_sync_module
+import src.routes.sync_weight as sync_weight_module
 from src.auth.session import create_jwt
 from src.config import get_config
 from src.middleware.csrf import CSRFMiddleware
 from src.models.oauth_models import OAuthProvider, OAuthToken
-from src.routes.bulk_sync import create_bulk_sync_router
+from src.routes.sync_weight import create_sync_weight_router
 from src.services.garmin_client import GarminSessionExpiredError
 from src.services.sync_orchestrator import SyncResult
 from src.templates_config import create_templates
@@ -27,6 +29,7 @@ def _oauth_token(access_token: str = "google-access", refresh_token: str = "goog
         provider=OAuthProvider.GOOGLE,
         access_token=access_token,
         refresh_token=refresh_token,
+        scope=None,
         expires_at=now + timedelta(hours=1),
         created_at=now,
         updated_at=now,
@@ -90,17 +93,17 @@ def mock_oauth_service():
 
 
 @pytest.fixture
-def bulk_sync_app(mock_db, mock_google_client, mock_garmin_client, mock_sync_orchestrator, mock_oauth_service):
+def sync_weight_app(mock_db, mock_google_client, mock_garmin_client, mock_sync_orchestrator, mock_oauth_service):
     cfg = get_config()
     templates = create_templates()
     app = FastAPI()
     app.add_middleware(CSRFMiddleware)
     with patch.object(
-        bulk_sync_module.GarminClient,
+        sync_weight_module.GarminClient,
         "create_for_user",
         return_value=mock_garmin_client,
     ):
-        router = create_bulk_sync_router(
+        router = create_sync_weight_router(
             templates, mock_db, mock_google_client, mock_garmin_client, mock_sync_orchestrator, mock_oauth_service, cfg
         )
         app.include_router(router)
@@ -108,8 +111,8 @@ def bulk_sync_app(mock_db, mock_google_client, mock_garmin_client, mock_sync_orc
 
 
 @pytest.fixture
-def client(bulk_sync_app):
-    return TestClient(bulk_sync_app, follow_redirects=False)
+def client(sync_weight_app):
+    return TestClient(sync_weight_app, follow_redirects=False)
 
 
 @pytest.fixture
@@ -126,31 +129,31 @@ def auth_token():
 
 def _get_csrf_token(client: TestClient, auth_token: str) -> str:
     client.cookies.set("session", auth_token)
-    response = client.get("/bulk-sync")
+    response = client.get("/sync/weight")
     return response.cookies.get("csrf_token") or ""
 
 
-class TestBulkSyncPage:
+class TestSyncWeightPage:
     def test_requires_auth(self, client):
-        response = client.get("/bulk-sync")
+        response = client.get("/sync/weight")
         assert response.status_code == 302
         assert "/login" in response.headers["location"]
 
     def test_renders_authenticated(self, client, auth_token):
         client.cookies.set("session", auth_token)
-        response = client.get("/bulk-sync")
+        response = client.get("/sync/weight")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
 
-class TestBulkSyncMeasurements:
+class TestSyncWeightMeasurements:
     def test_returns_table(self, client, auth_token, mock_google_client, mock_garmin_client):
         measurements = [_measurement(), _measurement(weight_kg=75.0, body_fat_pct=18.5)]
         mock_google_client.fetch_all_measurements.return_value = measurements
         mock_garmin_client.fetch_existing_weights.return_value = []
 
         client.cookies.set("session", auth_token)
-        response = client.get("/bulk-sync/measurements")
+        response = client.get("/sync/weight/measurements")
         assert response.status_code == 200
         assert "<table" in response.text
 
@@ -158,7 +161,7 @@ class TestBulkSyncMeasurements:
         mock_google_client.fetch_all_measurements.return_value = []
 
         client.cookies.set("session", auth_token)
-        response = client.get("/bulk-sync/measurements")
+        response = client.get("/sync/weight/measurements")
         assert response.status_code == 200
         assert "No measurements found" in response.text
 
@@ -166,17 +169,17 @@ class TestBulkSyncMeasurements:
         mock_db.get_oauth_token.return_value = None
 
         client.cookies.set("session", auth_token)
-        response = client.get("/bulk-sync/measurements")
+        response = client.get("/sync/weight/measurements")
         assert response.status_code == 200
         assert "Google Health not connected" in response.text
 
 
-class TestBulkSyncRecord:
+class TestSyncWeightRecord:
     def test_sync_record_success(self, client, auth_token, mock_sync_orchestrator):
         csrf_token = _get_csrf_token(client, auth_token)
 
         response = client.post(
-            "/bulk-sync/sync-record",
+            "/sync/weight/sync-record",
             data={
                 "csrf_token": csrf_token,
                 "timestamp": "2026-04-10T08:00:00+00:00",
@@ -192,7 +195,7 @@ class TestBulkSyncRecord:
 
     def test_requires_auth(self, client):
         response = client.post(
-            "/bulk-sync/sync-record",
+            "/sync/weight/sync-record",
             data={
                 "timestamp": "2026-04-10T08:00:00+00:00",
                 "weight_kg": "80.5",
@@ -208,7 +211,7 @@ class TestBulkSyncRecord:
         csrf_token = _get_csrf_token(client, auth_token)
 
         response = client.post(
-            "/bulk-sync/sync-record",
+            "/sync/weight/sync-record",
             data={
                 "csrf_token": csrf_token,
                 "timestamp": "2026-04-10T08:00:00+00:00",

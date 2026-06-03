@@ -1,5 +1,3 @@
-"""Bulk sync routes — manual sync trigger and measurements list with HTMX."""
-
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -15,6 +13,7 @@ from src.config import AppConfig
 from src.crypto.token_encryptor import TokenEncryptor
 from src.db.firestore_client import FirestoreClient
 from src.models.oauth_models import OAuthToken
+from src.routes.sync_common import build_sync_table_html, compare_measurements_with_garmin
 from src.services.garmin_client import (
     GarminClient,
     GarminRateLimitError,
@@ -56,133 +55,31 @@ async def _refresh_google_token(
     return refreshed.access_token
 
 
-def _build_measurements_rows(
-    measurements: list[Measurement],
-    synced_flags: list[bool] | None = None,
-    start_index: int = 0,
-    next_offset_days: int = 60,
-    days: int = 30,
-) -> str:
-    rows: list[str] = []
+WEIGHT_COLUMNS = [
+    {"key": "timestamp", "label": "Date / Time"},
+    {"key": "weight", "label": "Weight (kg)"},
+    {"key": "body_fat", "label": "Body Fat (%)"},
+]
+
+
+def _measurements_to_rows(measurements, synced_flags=None, start_index=0):
+    """Convert measurements to row_data dicts for build_sync_table_html."""
+    rows = []
     for index, m in enumerate(measurements):
         weight_kg = m.get("weight_kg")
         body_fat_pct = m.get("body_fat_pct")
-        timestamp = m["timestamp"]
-
-        ts_iso = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
-
-        weight_display = f"{weight_kg:.1f}" if weight_kg is not None else "\u2014"
-        body_fat_display = f"{body_fat_pct:.1f}" if body_fat_pct else "\u2014"
-
-        data_bf = f"{body_fat_pct}" if body_fat_pct else ""
-        data_weight = f"{weight_kg}" if weight_kg is not None else ""
-
         is_synced = synced_flags[index] if synced_flags else False
-        row_id = start_index + index
 
-        if is_synced:
-            tr_open = (
-                f'<tr id="row-{row_id}" data-timestamp="{ts_iso}" '
-                f'data-weight="{data_weight}" data-body-fat="{data_bf}" '
-                f'class="synced" aria-disabled="true" style="opacity:0.5">'
-            )
-            first_td = "<td><small>✓ Synced</small></td>"
-        else:
-            tr_open = f'<tr id="row-{row_id}" data-timestamp="{ts_iso}" data-weight="{data_weight}" data-body-fat="{data_bf}">'
-            first_td = f'<td><input type="checkbox" name="selected" value="{row_id}"></td>'
-
-        rows.append(
-            "".join(
-                [
-                    tr_open,
-                    first_td,
-                    f'<td class="timestamp" data-utc="{ts_iso}">{ts_iso}</td>',
-                    f"<td>{weight_display}</td>",
-                    f"<td>{body_fat_display}</td>",
-                    "</tr>",
-                ]
-            )
-        )
-
-    table_rows = "\n".join(rows)
-    load_more_button = (
-        '<tr id="load-more-row">'
-        '<td colspan="4" style="text-align: center; padding: 1rem;">'
-        f'<button hx-get="/bulk-sync/measurements?days={days}&offset_days={next_offset_days}" '
-        'hx-target="#load-more-row" hx-swap="outerHTML" hx-indicator="#load-more-spinner" '
-        'style="margin: 0;">Load more</button>'
-        "</td></tr>"
-    )
-    return f"{table_rows}\n{load_more_button}"
-
-
-def _build_measurements_table(
-    measurements: list[Measurement],
-    synced_flags: list[bool] | None = None,
-    start_index: int = 0,
-    next_offset_days: int = 30,
-    days: int = 30,
-) -> str:
-    rows: list[str] = []
-    for index, m in enumerate(measurements):
-        weight_kg = m.get("weight_kg")
-        body_fat_pct = m.get("body_fat_pct")
-        timestamp = m["timestamp"]
-
-        ts_iso = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
-
-        weight_display = f"{weight_kg:.1f}" if weight_kg is not None else "\u2014"
-        body_fat_display = f"{body_fat_pct:.1f}" if body_fat_pct else "\u2014"
-
-        data_bf = f"{body_fat_pct}" if body_fat_pct else ""
-        data_weight = f"{weight_kg}" if weight_kg is not None else ""
-
-        is_synced = synced_flags[index] if synced_flags else False
-        row_id = start_index + index
-
-        if is_synced:
-            tr_open = (
-                f'<tr id="row-{row_id}" data-timestamp="{ts_iso}" '
-                f'data-weight="{data_weight}" data-body-fat="{data_bf}" '
-                f'class="synced" aria-disabled="true" style="opacity:0.5">'
-            )
-            first_td = "<td><small>✓ Synced</small></td>"
-        else:
-            tr_open = f'<tr id="row-{row_id}" data-timestamp="{ts_iso}" data-weight="{data_weight}" data-body-fat="{data_bf}">'
-            first_td = f'<td><input type="checkbox" name="selected" value="{row_id}"></td>'
-
-        rows.append(
-            "".join(
-                [
-                    tr_open,
-                    first_td,
-                    f'<td class="timestamp" data-utc="{ts_iso}">{ts_iso}</td>',
-                    f"<td>{weight_display}</td>",
-                    f"<td>{body_fat_display}</td>",
-                    "</tr>",
-                ]
-            )
-        )
-
-    table_rows = "\n".join(rows)
-    load_more_button = (
-        '<tr id="load-more-row">'
-        '<td colspan="4" style="text-align: center; padding: 1rem;">'
-        f'<button hx-get="/bulk-sync/measurements?days={days}&offset_days={next_offset_days}" '
-        'hx-target="#load-more-row" hx-swap="outerHTML" hx-indicator="#load-more-spinner" '
-        'style="margin: 0;">Load more</button>'
-        "</td></tr>"
-    )
-
-    return (
-        "<table>\n"
-        "<thead><tr><th></th><th>Date / Time</th><th>Weight (kg)</th><th>Body Fat (%)</th></tr></thead>\n"
-        '<tbody id="measurements-body">\n'
-        f"{table_rows}\n"
-        f"{load_more_button}\n"
-        "</tbody>\n"
-        "</table>"
-    )
+        rows.append({
+            "row_id": start_index + index,
+            "timestamp": m["timestamp"],
+            "is_synced": is_synced,
+            "weight": f"{weight_kg}" if weight_kg is not None else "",
+            "weight_display": f"{weight_kg:.1f}" if weight_kg is not None else "\u2014",
+            "body_fat": f"{body_fat_pct}" if body_fat_pct else "",
+            "body_fat_display": f"{body_fat_pct:.1f}" if body_fat_pct else "\u2014",
+        })
+    return rows
 
 
 def _parse_timestamp(value: str) -> datetime:
@@ -221,28 +118,6 @@ def _build_failed_row_html(row_index: str, timestamp: str, weight_kg: str, body_
     )
 
 
-def _normalize_utc(ts: datetime) -> datetime:
-    if ts.tzinfo is None:
-        return ts.replace(tzinfo=UTC)
-    return ts.astimezone(UTC)
-
-
-def _has_matching_weight(
-    garmin_weights: list[dict[str, object]],
-    measurement_timestamp: datetime,
-    tolerance: timedelta,
-) -> bool:
-    measurement_utc = _normalize_utc(measurement_timestamp)
-    for garmin_weight in garmin_weights:
-        garmin_ts_raw = garmin_weight.get("timestamp_utc")
-        if not isinstance(garmin_ts_raw, datetime):
-            continue
-        garmin_utc = _normalize_utc(garmin_ts_raw)
-        if abs(garmin_utc - measurement_utc) <= tolerance:
-            return True
-    return False
-
-
 def _sync_error_message(result_message: str) -> str:
     if result_message == "garmin_session_expired":
         return "Garmin session expired"
@@ -278,12 +153,12 @@ async def _upload_single_record(
         return None, f"Sync failed: {exc}"
 
 
-def _create_bulk_sync_page_handler(
+def _create_sync_weight_page_handler(
     templates: Jinja2Templates,
     db_client: FirestoreClient,
     config: AppConfig,
 ):
-    async def bulk_sync_page(request: Request):
+    async def sync_weight_page(request: Request):
         try:
             user_id = await get_current_user(request, config.jwt_secret_key, config.jwt_algorithm)
         except HTTPException:
@@ -294,7 +169,7 @@ def _create_bulk_sync_page_handler(
 
         return templates.TemplateResponse(
             request,
-            "bulk-sync.html",
+            "sync-weight.html",
             {
                 "request": request,
                 "google_connected": google_token is not None,
@@ -303,10 +178,10 @@ def _create_bulk_sync_page_handler(
             },
         )
 
-    return bulk_sync_page
+    return sync_weight_page
 
 
-def _create_bulk_sync_measurements_handler(
+def _create_sync_weight_measurements_handler(
     db_client: FirestoreClient,
     google_client: GoogleHealthAPIClient,
     garmin_client: GarminClient | None,
@@ -314,7 +189,7 @@ def _create_bulk_sync_measurements_handler(
     oauth_service: GoogleOAuth2Service,
     config: AppConfig,
 ):
-    async def bulk_sync_measurements(request: Request, days: int = 30, offset_days: int = 0):
+    async def sync_weight_measurements(request: Request, days: int = 30, offset_days: int = 0):
         try:
             user_id = await get_current_user(request, config.jwt_secret_key, config.jwt_algorithm)
         except HTTPException:
@@ -363,27 +238,23 @@ def _create_bulk_sync_measurements_handler(
         )
 
         if offset_days == 0:
-            table_html = _build_measurements_table(
-                measurements, synced_flags=synced_flags, next_offset_days=offset_days + days, days=days
-            )
+            rows = _measurements_to_rows(measurements, synced_flags=synced_flags, start_index=0)
+            load_more_url = f"/sync/weight/measurements?days={days}&offset_days={offset_days + days}"
+            table_html = build_sync_table_html(rows, WEIGHT_COLUMNS, load_more_url, offset=0, limit=days)
             html_content = garmin_warning + table_html
         else:
             start_index = offset_days
-            html_content = _build_measurements_rows(
-                measurements,
-                synced_flags=synced_flags,
-                start_index=start_index,
-                next_offset_days=offset_days + days,
-                days=days,
-            )
+            rows = _measurements_to_rows(measurements, synced_flags=synced_flags, start_index=start_index)
+            load_more_url = f"/sync/weight/measurements?days={days}&offset_days={offset_days + days}"
+            html_content = build_sync_table_html(rows, WEIGHT_COLUMNS, load_more_url, offset=start_index, limit=days)
 
         return HTMLResponse(html_content)
 
-    return bulk_sync_measurements
+    return sync_weight_measurements
 
 
-def _create_bulk_sync_record_handler(sync_orchestrator: SyncOrchestrator, config: AppConfig):
-    async def bulk_sync_sync_record(request: Request):
+def _create_sync_weight_record_handler(sync_orchestrator: SyncOrchestrator, config: AppConfig):
+    async def sync_weight_sync_record(request: Request):
         try:
             user_id = await get_current_user(request, config.jwt_secret_key, config.jwt_algorithm)
         except HTTPException:
@@ -429,13 +300,13 @@ def _create_bulk_sync_record_handler(sync_orchestrator: SyncOrchestrator, config
         message = _sync_error_message(result_message or "")
         return HTMLResponse(_build_failed_row_html(row_index, timestamp, weight_kg, body_fat_pct, message))
 
-    return bulk_sync_sync_record
+    return sync_weight_sync_record
 
 
 async def _compare_with_garmin(
     db_client: FirestoreClient,
-    _garmin_client: GarminClient,
-    encryptor: TokenEncryptor,
+    _garmin_client: GarminClient | None,
+    encryptor: TokenEncryptor | None,
     user_id: str,
     measurements: list[Measurement],
     until_ts: datetime,
@@ -445,20 +316,28 @@ async def _compare_with_garmin(
     garmin_session = db_client.has_garmin_session(user_id)
     if not garmin_session:
         return _GARMIN_EXPIRED_HTML, None
+    if encryptor is None:
+        logger.warning("Garmin sync comparison unavailable for user %s: missing encryptor", user_id)
+        return _GARMIN_EXPIRED_HTML, None
 
     try:
         client = GarminClient.create_for_user(user_id, db_client.db, encryptor)
         garmin_weights = await client.fetch_existing_weights(end_date=until_ts.date(), days=days + offset_days)
     except GarminSessionExpiredError:
-        logger.warning("Garmin session expired for user %s during bulk-sync comparison", user_id)
+        logger.warning("Garmin session expired for user %s during sync-weight comparison", user_id)
         return _GARMIN_EXPIRED_HTML, None
+    except GarminRateLimitError:
+        logger.warning("Garmin rate limited during sync-weight comparison for user %s", user_id)
+        return (
+            '<p style="color: var(--pico-color-yellow-450);">'
+            "⚠️ Garmin is temporarily rate limited — sync status is unavailable.</p>"
+        ), None
 
-    tolerance = timedelta(minutes=5)
-    synced_flags = [_has_matching_weight(garmin_weights, m["timestamp"], tolerance) for m in measurements]
+    synced_flags = compare_measurements_with_garmin(measurements, garmin_weights, tolerance_minutes=5)
     return "", synced_flags
 
 
-def create_bulk_sync_router(
+def create_sync_weight_router(
     templates: Jinja2Templates,
     db_client: FirestoreClient,
     google_client: GoogleHealthAPIClient,
@@ -468,17 +347,17 @@ def create_bulk_sync_router(
     config: AppConfig,
     encryptor: TokenEncryptor | None = None,
 ) -> APIRouter:
-    """Create and configure bulk sync router."""
-    bulk_sync_router = APIRouter(tags=["bulk_sync"])
+    """Create and configure sync weight router."""
+    sync_weight_router = APIRouter(tags=["sync_weight"])
 
-    bulk_sync_router.add_api_route(
-        "/bulk-sync",
-        _create_bulk_sync_page_handler(templates, db_client, config),
+    sync_weight_router.add_api_route(
+        "/sync/weight",
+        _create_sync_weight_page_handler(templates, db_client, config),
         methods=["GET"],
     )
-    bulk_sync_router.add_api_route(
-        "/bulk-sync/measurements",
-        _create_bulk_sync_measurements_handler(
+    sync_weight_router.add_api_route(
+        "/sync/weight/measurements",
+        _create_sync_weight_measurements_handler(
             db_client,
             google_client,
             garmin_client,
@@ -488,13 +367,13 @@ def create_bulk_sync_router(
         ),
         methods=["GET"],
     )
-    bulk_sync_router.add_api_route(
-        "/bulk-sync/sync-record",
-        _create_bulk_sync_record_handler(sync_orchestrator, config),
+    sync_weight_router.add_api_route(
+        "/sync/weight/sync-record",
+        _create_sync_weight_record_handler(sync_orchestrator, config),
         methods=["POST"],
     )
 
-    return bulk_sync_router
+    return sync_weight_router
 
 
 async def _fetch_with_retry(

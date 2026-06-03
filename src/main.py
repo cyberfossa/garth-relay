@@ -13,10 +13,10 @@ from src.db import FirestoreClient
 from src.logging_setup import setup_logging
 from src.middleware import CSRFMiddleware, SecurityHeadersMiddleware
 from src.routes.auth import create_auth_router
-from src.routes.bulk_sync import create_bulk_sync_router
 from src.routes.connections import create_connections_router
 from src.routes.pages import create_pages_router
 from src.routes.polling import create_polling_router
+from src.routes.sync_weight import create_sync_weight_router
 from src.routes.webhooks import create_webhooks_router
 from src.services.garmin_client import GarminClient
 from src.services.google_health_client import GoogleHealthAPIClient
@@ -143,7 +143,7 @@ def _create_app() -> FastAPI:  # noqa: PLR0915
             db_client=db_client,
             encryptor=encryptor,
         )
-        bulk_sync_router = create_bulk_sync_router(
+        sync_weight_router = create_sync_weight_router(
             templates=templates,
             db_client=db_client,
             google_client=google_health_client,
@@ -153,13 +153,16 @@ def _create_app() -> FastAPI:  # noqa: PLR0915
             config=config,
             encryptor=encryptor,
         )
-        application.include_router(bulk_sync_router)
+        application.include_router(sync_weight_router)
 
     # Webhooks router (stub, CSRF exempt)
     webhooks_router = create_webhooks_router()
     application.include_router(webhooks_router)
 
     return application
+
+
+create_app = _create_app
 
 
 app = _create_app()

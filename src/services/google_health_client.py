@@ -14,7 +14,7 @@ logger = structlog.get_logger()
 JsonValue = object
 JsonDict = dict[str, JsonValue]
 
-GOOGLE_HEALTH_SCOPE = "https://www.googleapis.com/auth/fitness.body.read"
+GOOGLE_HEALTH_SCOPE = "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"
 
 
 class Measurement(TypedDict):
