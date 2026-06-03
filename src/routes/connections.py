@@ -19,10 +19,9 @@ from src.db.firestore_client import FirestoreClient
 from src.routes.connections_helpers import is_htmx, require_user
 from src.services.garmin_client import GarminClient, GarminRateLimitError, GarminSessionExpiredError
 from src.services.google_health_client import GOOGLE_HEALTH_SCOPE
+from src.services.oauth_state_store import OAuthStateStore
 
 logger = structlog.get_logger()
-
-_google_oauth_states: dict[str, str] = {}
 
 
 class _GarminAuthDB(Protocol):
@@ -61,6 +60,7 @@ def create_connections_router(  # noqa: C901, PLR0915
         Configured APIRouter.
     """
     router = APIRouter(prefix="/connections", tags=["connections"])
+    state_store = OAuthStateStore(db_client)
     google_connect_redirect_uri = (
         f"{app_base_url.rstrip('/')}/connections/google/callback" if app_base_url else google_redirect_uri
     )
@@ -73,7 +73,7 @@ def create_connections_router(  # noqa: C901, PLR0915
     @router.get("/google/auth")
     async def google_auth():
         state = secrets.token_urlsafe(32)
-        _google_oauth_states[state] = "google_connect"
+        await state_store.store_state(state, "google_connect")
 
         scopes = GOOGLE_HEALTH_SCOPE
         auth_url = (
@@ -91,10 +91,10 @@ def create_connections_router(  # noqa: C901, PLR0915
     @router.get("/google/callback")
     async def google_callback(state: str, request: Request, code: str | None = None, error: str | None = None):
         if error or not code:
-            _google_oauth_states.pop(state, None)
+            await state_store.pop_state(state)
             return RedirectResponse(url="/login", status_code=302)
 
-        stored_purpose = _google_oauth_states.pop(state, None)
+        stored_purpose = await state_store.pop_state(state)
         if stored_purpose != "google_connect":
             raise HTTPException(status_code=403, detail="Invalid or expired state parameter")
 
