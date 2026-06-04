@@ -21,7 +21,7 @@ services:
       start_period: 15s
 
   firebase-emulator:
-    image: node:22-slim
+    image: node:22-bookworm
     working_dir: /app
     volumes:
       - ./firebase.json:/app/firebase.json
@@ -29,7 +29,8 @@ services:
       - "8081:8081"
       - "4000:4000"
     command: >
-      sh -c "npm install -g firebase-tools@14 &&
+      sh -c "apt-get update && apt-get install -y default-jre &&
+             npm install -g firebase-tools@14 &&
              exec firebase emulators:start --project demo-local --only firestore"
     healthcheck:
       test:
