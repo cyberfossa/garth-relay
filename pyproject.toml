@@ -27,7 +27,7 @@ dependencies = [
     "google-auth>=2.29",
     "google-auth-oauthlib>=1.2",
     "httpx>=0.28",
-    "garth-ng @ git+https://github.com/cyberfossa/garth-ng.git@main",
+    "garth-ng>=2.0.0a0",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +44,9 @@ dev = [
 [tool.uv.build-backend]
 module-name = "src"
 module-root = ""
+
+[tool.uv]
+prerelease = "allow"
 
 [tool.ruff]
 target-version = "py312"
