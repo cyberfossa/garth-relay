@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8080"
+    env_file:
+      - .env
+    environment:
+      FIRESTORE_EMULATOR_HOST: "firebase-emulator:8081"
+      APP_GCP_PROJECT_ID: "demo-local"
+      APP_GOOGLE_OAUTH_REDIRECT_URI: "http://localhost:8000/auth/callback"
+    depends_on:
+      firebase-emulator:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD", "sh", "-c", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8080/health\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  firebase-emulator:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - ./firebase.json:/app/firebase.json
+    ports:
+      - "8081:8081"
+      - "4000:4000"
+    command: >
+      sh -c "npm install -g firebase-tools@14 &&
+             exec firebase emulators:start --project demo-local --only firestore"
+    healthcheck:
+      test:
+        ["CMD", "sh", "-c", "node -e \"const h=require('http');h.get('http://localhost:4000',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
