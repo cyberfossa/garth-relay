@@ -8,6 +8,9 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[options]
+prerelease-mode = "allow"
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"
@@ -479,13 +482,17 @@ wheels = [
 [[package]]
 name = "garth-ng"
 version = "2.0.0a0"
-source = { git = "https://github.com/cyberfossa/garth-ng.git?rev=main#9bd073ec07447fd2269cf11cd23a276680219470" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "curl-cffi" },
     { name = "garmin-fit-sdk" },
     { name = "logfire" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/12/97/686dd648b2b8699be30d16c6174d9d0ab9732c98ac8dab38db7465e16d96/garth_ng-2.0.0a0.tar.gz", hash = "sha256:57e5f7f4807e319e7cb84cfe21870aae9b8fa35d36133e0d69fa7aa9ce5a1f2c", size = 1997543, upload-time = "2026-06-03T14:16:06.18Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/4e/c820350a8affbd4c29d9f8058aedb9e7a9033f32a3cd9ca806f522c2f8d6/garth_ng-2.0.0a0-py3-none-any.whl", hash = "sha256:1d25f2a4b224b07e5ded77f8ad98184f4f1eb00ba7d954211044abf60d0b9ae8", size = 70128, upload-time = "2026-06-03T14:16:04.746Z" },
 ]
 
 [[package]]
@@ -525,7 +532,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=44.0" },
     { name = "environ-config", specifier = ">=24.1" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "garth-ng", git = "https://github.com/cyberfossa/garth-ng.git?rev=main" },
+    { name = "garth-ng", specifier = ">=2.0.0a0" },
     { name = "google-auth", specifier = ">=2.29" },
     { name = "google-auth-oauthlib", specifier = ">=1.2" },
     { name = "google-cloud-firestore", specifier = ">=2.19" },
