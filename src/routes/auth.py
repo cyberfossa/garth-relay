@@ -1,7 +1,5 @@
 """Authentication and OAuth2 routes with JWT session cookies."""
 
-from datetime import UTC, datetime, timedelta
-
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -38,7 +36,7 @@ def create_auth_router(  # noqa: C901
     @auth_router.get("/callback")
     async def callback(state: str, code: str | None = None, error: str | None = None):
         if error or not code:
-            await state_store.pop_state(state)
+            _ = await state_store.pop_state(state)
             return RedirectResponse(url="/login", status_code=302)
 
         # Validate state
@@ -72,17 +70,9 @@ def create_auth_router(  # noqa: C901
             algorithm=config.jwt_algorithm,
         )
 
-        # Persist user profile and Google OAuth tokens for background polling
+        # Persist user profile
         if db_client:
-            db_client.save_user_profile(user_id, email, name)
-            expires_at = datetime.now(UTC) + timedelta(seconds=token_response.expires_in)
-            db_client.save_oauth_token(
-                user_id,
-                "google",
-                token_response.access_token,
-                token_response.refresh_token,
-                expires_at,
-            )
+            _ = db_client.save_user_profile(user_id, email, name)
 
         response = RedirectResponse(url="/dashboard", status_code=302)
         response.set_cookie(
