@@ -1,6 +1,7 @@
 """FastAPI application for garth-relay."""
 
 from contextlib import asynccontextmanager
+import os
 from urllib.parse import urlparse
 
 import structlog
@@ -170,4 +171,4 @@ app = _create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
