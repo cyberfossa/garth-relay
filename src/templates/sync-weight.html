@@ -29,6 +29,61 @@
         <div id="measurements-table" hx-get="/sync/weight/measurements" hx-trigger="load" hx-target="#measurements-table">
             <p>Loading measurements...</p>
         </div>
+        <button id="sync-selected-btn" style="display:none; margin-top: 1rem;" disabled>Sync Selected</button>
+        <script>
+        (function() {
+          var btn = document.getElementById('sync-selected-btn');
+          var table = document.getElementById('measurements-table');
+
+          function updateBtn() {
+            var checkboxes = document.querySelectorAll('#measurements-body input[type=checkbox]');
+            var checked = document.querySelectorAll('#measurements-body input[type=checkbox]:checked');
+            if (checkboxes.length === 0) {
+              btn.style.display = 'none';
+            } else {
+              btn.style.display = '';
+              btn.disabled = checked.length === 0;
+            }
+          }
+
+          table.addEventListener('htmx:afterSettle', updateBtn);
+
+          document.addEventListener('change', function(e) {
+            if (e.target.closest('#measurements-body')) {
+              updateBtn();
+            }
+          });
+
+          btn.addEventListener('click', async function() {
+            var checked = document.querySelectorAll('#measurements-body input[type=checkbox]:checked');
+            if (checked.length === 0) return;
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            try {
+              for (var i = 0; i < checked.length; i++) {
+                var tr = checked[i].closest('tr');
+                var rowIndex = tr.id.replace('row-', '');
+                var csrfToken = (document.cookie.match(/csrf_token=([^;]+)/) || [])[1] || '';
+                await htmx.ajax('POST', '/sync/weight/sync-record', {
+                  target: tr,
+                  swap: 'outerHTML',
+                  values: {
+                    timestamp: tr.dataset.timestamp,
+                    weight_kg: tr.dataset.weight,
+                    body_fat_pct: tr.dataset.bodyFat,
+                    row_index: rowIndex,
+                    csrf_token: csrfToken
+                  }
+                });
+              }
+            } finally {
+              btn.disabled = false;
+              btn.removeAttribute('aria-busy');
+              updateBtn();
+            }
+          });
+        })();
+        </script>
     </section>
     {% endif %}
 </article>

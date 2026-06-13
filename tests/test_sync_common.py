@@ -117,6 +117,47 @@ class TestBuildSyncTableHtml:
         assert '<tr id="load-more-row">' in html
         assert 'hx-get="/load-more?page=3"' in html
 
+    def test_button_not_in_table_html_with_unsynced_rows(self):
+        rows = [
+            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": False, "weight_kg_display": "80.5 kg"},
+        ]
+        html = build_sync_table_html(rows, _columns(), "/load", 0, 10)
+
+        assert 'id="sync-selected-btn"' not in html
+        assert "<script>" not in html
+
+    def test_button_absent_when_all_rows_synced(self):
+        rows = [
+            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": True, "weight_kg_display": "80.5 kg"},
+        ]
+        html = build_sync_table_html(rows, _columns(), "/load", 0, 10)
+
+        assert "sync-selected-btn" not in html
+        assert "<script>" not in html
+
+    def test_button_absent_when_pagination(self):
+        rows = [
+            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": False, "weight_kg_display": "80.5 kg"},
+        ]
+        html = build_sync_table_html(rows, _columns(), "/load", 30, 10)
+
+        assert "sync-selected-btn" not in html
+
+    def test_button_absent_when_rows_empty(self):
+        html = build_sync_table_html([], _columns(), "/load", 0, 10)
+
+        assert "sync-selected-btn" not in html
+        assert "<script>" not in html
+
+    def test_build_sync_table_html_never_contains_button(self):
+        rows = [
+            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": False, "weight_kg_display": "80.5 kg"},
+        ]
+        html = build_sync_table_html(rows, _columns(), "/load", 0, 10)
+
+        assert "sync-selected-btn" not in html
+        assert "<script>" not in html
+
 
 class TestFormatMeasurementTimestamp:
     def test_datetime_returns_isoformat(self):
