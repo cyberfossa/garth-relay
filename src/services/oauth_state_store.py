@@ -36,11 +36,13 @@ class OAuthStateStore:
             self._memory[state] = purpose
             return
         now = datetime.now(UTC)
-        self._db.collection(COLLECTION).document(state).set({
-            "purpose": purpose,
-            "created_at": now,
-            "expire_at": now + timedelta(minutes=TTL_MINUTES),
-        })
+        self._db.collection(COLLECTION).document(state).set(
+            {
+                "purpose": purpose,
+                "created_at": now,
+                "expire_at": now + timedelta(minutes=TTL_MINUTES),
+            }
+        )
 
     async def pop_state(self, state: str) -> str | None:
         """Read and delete an OAuth state, returning purpose or None.

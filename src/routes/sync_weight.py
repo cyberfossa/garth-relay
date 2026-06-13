@@ -70,15 +70,17 @@ def _measurements_to_rows(measurements, synced_flags=None, start_index=0):
         body_fat_pct = m.get("body_fat_pct")
         is_synced = synced_flags[index] if synced_flags else False
 
-        rows.append({
-            "row_id": start_index + index,
-            "timestamp": m["timestamp"],
-            "is_synced": is_synced,
-            "weight": f"{weight_kg}" if weight_kg is not None else "",
-            "weight_display": f"{weight_kg:.1f}" if weight_kg is not None else "\u2014",
-            "body_fat": f"{body_fat_pct}" if body_fat_pct else "",
-            "body_fat_display": f"{body_fat_pct:.1f}" if body_fat_pct else "\u2014",
-        })
+        rows.append(
+            {
+                "row_id": start_index + index,
+                "timestamp": m["timestamp"],
+                "is_synced": is_synced,
+                "weight": f"{weight_kg}" if weight_kg is not None else "",
+                "weight_display": f"{weight_kg:.1f}" if weight_kg is not None else "\u2014",
+                "body_fat": f"{body_fat_pct}" if body_fat_pct else "",
+                "body_fat_display": f"{body_fat_pct:.1f}" if body_fat_pct else "\u2014",
+            }
+        )
     return rows
 
 

@@ -81,7 +81,7 @@ def build_sync_row_html(row_data, columns):
     for col in columns:
         if col["key"] == "timestamp":
             continue
-        display_value = row_data.get(f'{col["key"]}_display', "\u2014")
+        display_value = row_data.get(f"{col['key']}_display", "\u2014")
         cells.append(f"<td>{display_value}</td>")
 
     return tr_open + "".join(cells) + "</tr>"

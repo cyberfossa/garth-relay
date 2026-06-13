@@ -55,7 +55,9 @@ class TestCompareMeasurementsWithGarmin:
         assert result == []
 
     def test_empty_garmin_weights_marks_all_false(self):
-        result = compare_measurements_with_garmin([_measurement(), _measurement(datetime(2026, 4, 10, 9, 0, tzinfo=UTC))], [])
+        result = compare_measurements_with_garmin(
+            [_measurement(), _measurement(datetime(2026, 4, 10, 9, 0, tzinfo=UTC))], []
+        )
 
         assert result == [False, False]
 
@@ -80,7 +82,7 @@ class TestBuildSyncRowHtml:
         assert '<tr id="row-1"' in html
         assert 'type="checkbox"' in html
         assert 'data-utc="2026-04-10T08:00:00+00:00"' in html
-        assert '<td>80.5 kg</td>' in html
+        assert "<td>80.5 kg</td>" in html
 
     def test_builds_synced_row(self):
         html = build_sync_row_html(
@@ -95,21 +97,33 @@ class TestBuildSyncRowHtml:
 
         assert 'class="synced"' in html
         assert 'aria-disabled="true"' in html
-        assert '<small>✓ Synced</small>' in html
+        assert "<small>✓ Synced</small>" in html
 
 
 class TestBuildSyncTableHtml:
     def test_offset_zero_renders_full_table(self):
-        html = build_sync_table_html([{"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "weight_kg_display": "80.5 kg"}], _columns(), "/load-more?page=2", 0, 10)
+        html = build_sync_table_html(
+            [{"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "weight_kg_display": "80.5 kg"}],
+            _columns(),
+            "/load-more?page=2",
+            0,
+            10,
+        )
 
         assert html.startswith("<table>")
         assert "<thead>" in html
-        assert "<tbody id=\"measurements-body\">" in html
+        assert '<tbody id="measurements-body">' in html
         assert "</table>" in html
         assert 'hx-get="/load-more?page=2"' in html
 
     def test_offset_positive_renders_rows_and_load_more_only(self):
-        html = build_sync_table_html([{"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "weight_kg_display": "80.5 kg"}], _columns(), "/load-more?page=3", 5, 10)
+        html = build_sync_table_html(
+            [{"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "weight_kg_display": "80.5 kg"}],
+            _columns(),
+            "/load-more?page=3",
+            5,
+            10,
+        )
 
         assert "<table>" not in html
         assert "<thead>" not in html
@@ -119,7 +133,12 @@ class TestBuildSyncTableHtml:
 
     def test_button_not_in_table_html_with_unsynced_rows(self):
         rows = [
-            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": False, "weight_kg_display": "80.5 kg"},
+            {
+                "row_id": 1,
+                "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                "is_synced": False,
+                "weight_kg_display": "80.5 kg",
+            },
         ]
         html = build_sync_table_html(rows, _columns(), "/load", 0, 10)
 
@@ -128,7 +147,12 @@ class TestBuildSyncTableHtml:
 
     def test_button_absent_when_all_rows_synced(self):
         rows = [
-            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": True, "weight_kg_display": "80.5 kg"},
+            {
+                "row_id": 1,
+                "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                "is_synced": True,
+                "weight_kg_display": "80.5 kg",
+            },
         ]
         html = build_sync_table_html(rows, _columns(), "/load", 0, 10)
 
@@ -137,7 +161,12 @@ class TestBuildSyncTableHtml:
 
     def test_button_absent_when_pagination(self):
         rows = [
-            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": False, "weight_kg_display": "80.5 kg"},
+            {
+                "row_id": 1,
+                "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                "is_synced": False,
+                "weight_kg_display": "80.5 kg",
+            },
         ]
         html = build_sync_table_html(rows, _columns(), "/load", 30, 10)
 
@@ -151,7 +180,12 @@ class TestBuildSyncTableHtml:
 
     def test_build_sync_table_html_never_contains_button(self):
         rows = [
-            {"row_id": 1, "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC), "is_synced": False, "weight_kg_display": "80.5 kg"},
+            {
+                "row_id": 1,
+                "timestamp": datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
+                "is_synced": False,
+                "weight_kg_display": "80.5 kg",
+            },
         ]
         html = build_sync_table_html(rows, _columns(), "/load", 0, 10)
 
