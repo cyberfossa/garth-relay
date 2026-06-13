@@ -39,7 +39,12 @@
 
     <footer class="container">
         <hr>
-        <small>Garth Relay - Health Metrics to Garmin Connect</small>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <small>Garth Relay - Health Metrics to Garmin Connect</small>
+            <small style="color: var(--pico-muted-color);">
+                v{{ app_version }}{% if app_git_sha %} ({{ app_git_sha }}){% endif %}
+            </small>
+        </div>
     </footer>
 </body>
 </html>

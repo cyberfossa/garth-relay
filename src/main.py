@@ -22,7 +22,7 @@ from src.routes.webhooks import create_webhooks_router
 from src.services.garmin_client import GarminClient
 from src.services.google_health_client import GoogleHealthAPIClient
 from src.services.sync_orchestrator import SyncOrchestrator
-from src.templates_config import create_templates
+from src.templates_config import create_templates, get_app_version
 
 setup_logging()
 logger = structlog.get_logger()
@@ -66,7 +66,7 @@ def _create_app() -> FastAPI:  # noqa: PLR0915
     application = FastAPI(
         title="garth-relay",
         description="Garth Relay service",
-        version="0.1.0",
+        version=get_app_version(),
         lifespan=lifespan,
     )
 
