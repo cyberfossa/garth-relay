@@ -55,6 +55,17 @@
         <section>
             <h3>Sync Data</h3>
             {% if google_connected and garmin_connected %}
+            <form style="margin-bottom: 1rem;">
+                {{ csrf_hidden_field(request) | safe }}
+                <label for="sync_enabled">
+                    <input type="checkbox" id="sync_enabled" name="sync_enabled" role="switch"
+                           {% if user_profile and user_profile.sync_enabled %}checked{% endif %}
+                           hx-post="/connections/toggle-sync"
+                           hx-trigger="change">
+                    Automatic Synchronization
+                </label>
+            </form>
+
             <form hx-post="/polling/sync-now" hx-target="#sync-result" hx-swap="innerHTML" hx-indicator="#sync-spinner" style="margin-top: 1rem;">
                 {{ csrf_hidden_field(request) | safe }}
                 <button type="submit">Sync Now</button>

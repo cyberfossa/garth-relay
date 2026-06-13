@@ -157,7 +157,11 @@ def _create_app() -> FastAPI:  # noqa: PLR0915
         application.include_router(sync_weight_router)
 
     # Webhooks router (stub, CSRF exempt)
-    webhooks_router = create_webhooks_router()
+    webhooks_router = create_webhooks_router(
+        db_client=db_client,
+        sync_orchestrator=sync_orchestrator if db_client else None,
+        webhook_secret=config.google_health_webhook_secret,
+    )
     application.include_router(webhooks_router)
 
     return application
