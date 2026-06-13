@@ -111,9 +111,7 @@ class TestGarminAuth:
 
     def test_mfa_required_returns_mfa_form(self, client, auth_token, mock_garmin_client, mock_db):
         _auth(client, auth_token)
-        mfa_challenge = MFAChallenge(
-            MFAState(strategy_name="sms", domain="garmin.com", state={}), {"cookie": "value"}
-        )
+        mfa_challenge = MFAChallenge(MFAState(strategy_name="sms", domain="garmin.com", state={}), {"cookie": "value"})
         mock_garmin_client.login.return_value = mfa_challenge
 
         response = client.post(
@@ -218,6 +216,12 @@ class TestGoogleConnectFlow:
             "refresh_token": "google-refresh",
             "expires_in": 3600,
         }
+
+        # Setup mock db to return the correct purpose for the stored state
+        mock_doc = MagicMock()
+        mock_doc.exists = True
+        mock_doc.to_dict.return_value = {"purpose": "google_connect"}
+        mock_db.db.collection.return_value.document.return_value.get.return_value = mock_doc
 
         with patch("src.routes.connections.httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
