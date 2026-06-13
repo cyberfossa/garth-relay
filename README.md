@@ -64,3 +64,110 @@ The sync pages follow an extensible pattern. Use these steps to add a new health
 5. **Templates**: Extend `base.html` and include `partials/sync-nav.html` for navigation tabs.
 6. **Nav tabs**: Update `src/templates/partials/sync-nav.html` to add a new `<li>` for the source.
 7. **Main registration**: Register the new router in `src/main.py` using the factory pattern.
+
+---
+
+## Deployment to Google Cloud Platform (GCP)
+
+This repository includes a Terraform configuration to provision all required GCP resources and a GitHub Actions workflow for automated deployments.
+
+### Prerequisites
+
+1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) and [Terraform](https://developer.hashicorp.com/terraform/downloads).
+2. Create a new GCP project and enable billing.
+3. Authenticate with your GCP account:
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login
+   ```
+
+### 1. Provision Infrastructure with Terraform
+
+Navigate to the `infra` directory:
+```bash
+cd infra
+```
+
+Create a `terraform.tfvars` file (or pass them via command line) to define your variables:
+```hcl
+project_id        = "your-gcp-project-id"
+github_repository = "your-github-username/your-forked-repo-name"
+# region          = "europe-west3" # Optional, defaults to europe-west3
+# app_name        = "garth-relay"  # Optional, defaults to garth-relay
+```
+
+Initialize and apply the Terraform configuration:
+```bash
+terraform init
+terraform apply
+```
+
+This will output the values needed for GitHub Actions configuration (like `wif_provider_name` and `github_actions_sa_email`).
+
+### 2. Generate and Configure Secrets
+
+Terraform creates placeholder secrets in Secret Manager. You must populate them with your actual values before deploying.
+
+#### How to Generate Encryption & Session Keys:
+Run these commands in your local terminal to generate secure random keys:
+- **`APP_ENCRYPTION_KEY`** (32-byte AES key):
+  ```bash
+  python3 -c "import os, base64; print(base64.urlsafe_b64encode(os.urandom(32)).rstrip(b'=').decode())"
+  ```
+- **`APP_JWT_SECRET_KEY`** and **`APP_CSRF_SECRET`**:
+  ```bash
+  python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+  ```
+
+#### How to Create Google OAuth 2.0 Credentials:
+1. In the Google Cloud Console, navigate to **APIs & Services** > **Credentials**.
+2. Click **Create Credentials** at the top, and select **OAuth client ID**.
+3. Select **Web application** as the application type.
+4. Name your client (e.g., `Garth Relay Client`).
+5. Under **Authorized redirect URIs**, add your redirect URLs:
+   - For local development (optional): `http://localhost:8080/auth/callback` and `http://localhost:8080/connections/google/callback`
+   - For Cloud Run (once deployed): `https://<YOUR-CLOUD-RUN-URL>/auth/callback` and `https://<YOUR-CLOUD-RUN-URL>/connections/google/callback`
+   *(Note: You can deploy the service first, get the URL, and then add these URIs to the OAuth Client).*
+6. Click **Create**. Copy the generated **Client ID** and **Client Secret**.
+
+#### How to Populate Secret Manager:
+1. Open **Secret Manager** in the GCP Console.
+2. For each secret created by Terraform, click its name, click **New Version**, paste the corresponding value, and click **Add Version**:
+   - `${app_name}-APP_ENCRYPTION_KEY`: The generated 32-byte AES key.
+   - `${app_name}-APP_JWT_SECRET_KEY`: The generated JWT signing key.
+   - `${app_name}-APP_CSRF_SECRET`: The generated CSRF protection key.
+   - `${app_name}-APP_GOOGLE_CLIENT_ID`: Your Google OAuth Client ID.
+   - `${app_name}-APP_GOOGLE_CLIENT_SECRET`: Your Google OAuth Client Secret.
+
+### 3. Configure OAuth Consent Screen (Manual Step)
+
+Before your application can authenticate users and access their Google Health data, you must manually configure the OAuth Consent Screen in the Google Cloud Console (this step cannot be automated via Terraform):
+
+1. In the Google Cloud Console, navigate to **APIs & Services** > **OAuth consent screen**.
+2. Select **External** as the user type (or **Internal** if using Google Workspace).
+3. Fill in the required app details (App name, support email, developer contact email).
+4. Click **Save and Continue**.
+5. In the **Scopes** step, click **Add or Remove Scopes** and add:
+   - `https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly` (This is the scope required to sync Google Health metrics).
+6. In the **Test users** step, add your Gmail account email address. (Required while the app is in "Testing" status).
+7. Save.
+
+### 4. Configure GitHub Actions Secrets & Variables
+
+In your forked GitHub repository, navigate to **Settings** -> **Secrets and variables** -> **Actions** and add the following:
+
+#### Secrets
+- `GCP_PROJECT_ID`: Your GCP Project ID.
+- `GCP_WIF_PROVIDER`: The `wif_provider_name` output from Terraform.
+- `GCP_SERVICE_ACCOUNT`: The `github_actions_sa_email` output from Terraform.
+
+#### Variables (Optional)
+- `GCP_REGION`: The GCP region used in Terraform (defaults to `europe-west3`).
+- `GCP_APP_NAME`: The app name used in Terraform (defaults to `garth-relay`).
+
+### 5. Deploy
+
+Push any change to the `main` branch, or trigger the workflow manually under the **Actions** tab. The GitHub Actions runner will authenticate using Workload Identity Federation (WIF), build the Docker image, push it to Artifact Registry, and deploy/update the Cloud Run service.
+
+Once deployed, the app will automatically configure its own `APP_GOOGLE_OAUTH_REDIRECT_URI` environment variable based on the Cloud Run URL.
+
