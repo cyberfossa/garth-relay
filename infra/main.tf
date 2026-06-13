@@ -1,5 +1,9 @@
 terraform {
   required_version = ">= 1.3.0"
+  backend "gcs" {
+    bucket = "garth-relay-tfstate"
+    prefix = "terraform/state"
+  }
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -79,9 +83,9 @@ locals {
 }
 
 resource "google_secret_manager_secret" "secrets" {
-  for_each  = toset(local.secret_names)
+  for_each   = toset(local.secret_names)
   depends_on = [google_project_service.enabled_apis["secretmanager.googleapis.com"]]
-  secret_id = "${var.app_name}-${each.value}"
+  secret_id  = "${var.app_name}-${each.value}"
 
   replication {
     auto {}
@@ -122,7 +126,7 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-provider"
   display_name                       = "GitHub Provider"
-  
+
   attribute_mapping = {
     "google.subject"       = "assertion.sub"
     "attribute.actor"      = "assertion.actor"
@@ -130,7 +134,7 @@ resource "google_iam_workload_identity_pool_provider" "github_provider" {
   }
 
   attribute_condition = "assertion.repository == '${var.github_repository}'"
-  
+
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
