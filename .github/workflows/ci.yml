@@ -1,0 +1,50 @@
+name: CI (Lint & Test)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Ruff Check
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check"
+
+      - name: Run Ruff Format Check
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check"
+
+  test:
+    name: Run Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Pytest
+        run: uv run pytest
