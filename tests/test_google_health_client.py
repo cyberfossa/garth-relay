@@ -254,6 +254,44 @@ class TestFetchAllMeasurements:
             assert len(result) == 1
             assert result[0]["body_fat_pct"] is None
 
+    @pytest.mark.asyncio
+    async def test_deduplicates_by_timestamp(self, health_client):
+        ts = datetime(2024, 1, 15, 10, 0, 0, tzinfo=UTC)
+        weight_points = [
+            WeightDataPoint(weight_kg=85.0, timestamp=ts, utc_offset_seconds=0, civil_time_hours=10),
+            WeightDataPoint(weight_kg=84.9, timestamp=ts, utc_offset_seconds=0, civil_time_hours=10),
+        ]
+        body_fat_points = [
+            BodyFatDataPoint(percentage=22.5, timestamp=ts, utc_offset_seconds=0, civil_time_hours=10),
+        ]
+
+        with (
+            patch.object(health_client, "fetch_weight", new_callable=AsyncMock, return_value=weight_points),
+            patch.object(health_client, "fetch_body_fat", new_callable=AsyncMock, return_value=body_fat_points),
+        ):
+            result = await health_client.fetch_all_measurements("tok", "2024-01-01T00:00:00Z")
+            assert len(result) == 1
+            assert result[0]["weight_kg"] in (85.0, 84.9)
+            assert result[0]["body_fat_pct"] == 22.5
+
+    @pytest.mark.asyncio
+    async def test_deduplicates_subsecond_timestamps(self, health_client):
+        ts1 = datetime(2024, 1, 15, 10, 0, 0, 123456, tzinfo=UTC)
+        ts2 = datetime(2024, 1, 15, 10, 0, 0, 789012, tzinfo=UTC)
+        weight_points = [
+            WeightDataPoint(weight_kg=85.0, timestamp=ts1, utc_offset_seconds=0, civil_time_hours=10),
+            WeightDataPoint(weight_kg=84.9, timestamp=ts2, utc_offset_seconds=0, civil_time_hours=10),
+        ]
+        body_fat_points = []
+
+        with (
+            patch.object(health_client, "fetch_weight", new_callable=AsyncMock, return_value=weight_points),
+            patch.object(health_client, "fetch_body_fat", new_callable=AsyncMock, return_value=body_fat_points),
+        ):
+            result = await health_client.fetch_all_measurements("tok", "2024-01-01T00:00:00Z")
+            assert len(result) == 1
+            assert result[0]["weight_kg"] in (85.0, 84.9)
+
 
 class TestRequestWithRetry:
     @pytest.mark.asyncio

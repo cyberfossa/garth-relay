@@ -159,8 +159,18 @@ class GoogleHealthAPIClient:
                 )
             )
 
-        measurements.sort(key=lambda m: m["timestamp"])
-        return measurements
+        # Deduplicate measurements by timestamp (rounded to the nearest second)
+        deduplicated: dict[datetime, Measurement] = {}
+        for m in measurements:
+            ts = m["timestamp"].replace(microsecond=0)
+            if ts not in deduplicated:
+                deduplicated[ts] = m
+            else:
+                existing = deduplicated[ts]
+                if existing.get("body_fat_pct") is None and m.get("body_fat_pct") is not None:
+                    deduplicated[ts] = m
+
+        return sorted(deduplicated.values(), key=lambda m: m["timestamp"])
 
     async def _fetch_data_points(self, access_token: str, data_type_path: str, filter_value: str) -> list[JsonDict]:
         """Fetch paginated data points from the Health API."""
