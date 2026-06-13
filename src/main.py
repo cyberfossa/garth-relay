@@ -1,7 +1,7 @@
 """FastAPI application for garth-relay."""
 
-from contextlib import asynccontextmanager
 import os
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import structlog

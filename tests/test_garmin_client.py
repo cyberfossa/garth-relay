@@ -65,9 +65,7 @@ class TestLogin:
         result = await garmin_client.login("user@example.com", "password")
 
         assert result is None
-        mock_garth_client.login.assert_called_once_with(
-            "user@example.com", "password", return_on_mfa=True
-        )
+        mock_garth_client.login.assert_called_once_with("user@example.com", "password", return_on_mfa=True)
 
     async def test_login_401_raises_session_expired(self, garmin_client, mock_garth_client):
         mock_garth_client.login = MagicMock(side_effect=_make_garth_http_error(401))
@@ -92,9 +90,7 @@ class TestLoginMFA:
         result = await garmin_client.login("user@example.com", "password")
 
         assert result == mock_challenge
-        mock_garth_client.login.assert_called_once_with(
-            "user@example.com", "password", return_on_mfa=True
-        )
+        mock_garth_client.login.assert_called_once_with("user@example.com", "password", return_on_mfa=True)
 
     async def test_http_error_raises(self, garmin_client, mock_garth_client):
         mock_garth_client.login = MagicMock(side_effect=_make_garth_http_error(429))
