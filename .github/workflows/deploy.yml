@@ -54,7 +54,7 @@ jobs:
             --region=${{ vars.GCP_REGION || 'europe-west3' }} \
             --service-account=${{ vars.GCP_APP_NAME || 'garth-relay' }}-runner@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --allow-unauthenticated \
-            --set-secrets="APP_ENCRYPTION_KEY=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_ENCRYPTION_KEY:latest,APP_JWT_SECRET_KEY=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_JWT_SECRET_KEY:latest,APP_CSRF_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_CSRF_SECRET:latest,APP_GOOGLE_CLIENT_ID=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_CLIENT_ID:latest,APP_GOOGLE_CLIENT_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_CLIENT_SECRET:latest" \
+            --set-secrets="APP_ENCRYPTION_KEY=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_ENCRYPTION_KEY:latest,APP_JWT_SECRET_KEY=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_JWT_SECRET_KEY:latest,APP_CSRF_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_CSRF_SECRET:latest,APP_GOOGLE_CLIENT_ID=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_CLIENT_ID:latest,APP_GOOGLE_CLIENT_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_CLIENT_SECRET:latest,APP_GOOGLE_HEALTH_WEBHOOK_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_HEALTH_WEBHOOK_SECRET:latest" \
             --set-env-vars="APP_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" \
             --quiet
 

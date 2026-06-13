@@ -56,6 +56,43 @@ class FirestoreClient:
             logger.exception("Failed to update user status", user_id=user_id)
             return False
 
+    def save_google_health_user_id(self, user_id: str, google_health_user_id: str) -> bool:
+        try:
+            self._user_ref(user_id).update(
+                {"google_health_user_id": google_health_user_id, "last_active": datetime.now(UTC)}
+            )
+            logger.info("Saved Google Health user ID", user_id=user_id, google_health_user_id=google_health_user_id)
+            return True
+        except Exception:
+            logger.exception("Failed to save Google Health user ID", user_id=user_id)
+            return False
+
+    def update_user_sync_enabled(self, user_id: str, enabled: bool) -> bool:
+        try:
+            self._user_ref(user_id).update({"sync_enabled": enabled, "last_active": datetime.now(UTC)})
+            logger.info("Updated user sync_enabled status", user_id=user_id, enabled=enabled)
+            return True
+        except Exception:
+            logger.exception("Failed to update user sync_enabled status", user_id=user_id)
+            return False
+
+    def get_user_id_by_health_user_id(self, google_health_user_id: str) -> str | None:
+        try:
+            docs = (
+                self.db.collection("users")
+                .where("google_health_user_id", "==", google_health_user_id)
+                .limit(1)
+                .stream()
+            )
+            for doc in docs:
+                return doc.id
+            return None
+        except Exception:
+            logger.exception(
+                "Failed to get user ID by Google Health user ID", google_health_user_id=google_health_user_id
+            )
+            return None
+
     def get_active_users(self) -> list[str]:
         try:
             docs = self.db.collection("users").where("status", "==", "active").stream()

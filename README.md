@@ -138,6 +138,7 @@ Run these commands in your local terminal to generate secure random keys:
    - `${app_name}-APP_CSRF_SECRET`: The generated CSRF protection key.
    - `${app_name}-APP_GOOGLE_CLIENT_ID`: Your Google OAuth Client ID.
    - `${app_name}-APP_GOOGLE_CLIENT_SECRET`: Your Google OAuth Client Secret.
+   - `${app_name}-APP_GOOGLE_HEALTH_WEBHOOK_SECRET`: A secure random token used to authorize the webhook handshake challenge. You can generate a random token using `openssl rand -hex 32` or similar.
 
 ### 3. Configure OAuth Consent Screen (Manual Step)
 
@@ -171,3 +172,34 @@ Push any change to the `main` branch, or trigger the workflow manually under the
 
 Once deployed, the app will automatically configure its own `APP_GOOGLE_OAUTH_REDIRECT_URI` environment variable based on the Cloud Run URL.
 
+### 6. Register Google Health Webhook Subscriber
+
+Once the application is successfully deployed and running on Cloud Run, you must register the webhook endpoint with the Google Health API. This is a one-time setup step:
+
+1. Authenticate with your GCP account:
+   ```bash
+   gcloud auth application-default login
+   ```
+2. Run the helper registration script, substituting your project number, Cloud Run URL, and webhook secret:
+   ```bash
+   uv run scripts/register_subscriber.py \
+     --project-number="<YOUR-GCP-PROJECT-NUMBER>" \
+     --webhook-url="https://<YOUR-CLOUD-RUN-URL>/webhooks/google-health" \
+     --webhook-secret="<YOUR-WEBHOOK-SECRET>"
+   ```
+
+To delete/unregister the webhook subscriber, you can run the script with the `--delete` flag (which only requires the `--project-number`):
+   ```bash
+   uv run scripts/register_subscriber.py \
+     --project-number="<YOUR-GCP-PROJECT-NUMBER>" \
+     --delete
+   ```
+
+To check the current status of the subscriber and retrieve a list of all active user subscriptions, run the script with the `--status` flag:
+   ```bash
+   uv run scripts/register_subscriber.py \
+     --project-number="<YOUR-GCP-PROJECT-NUMBER>" \
+     --status
+   ```
+
+*(Note: The project number is a 12-digit number found on your GCP Console Dashboard, not the text-based Project ID. The webhook secret must match the value you added to GCP Secret Manager for `APP_GOOGLE_HEALTH_WEBHOOK_SECRET`).*

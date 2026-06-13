@@ -80,7 +80,12 @@ class SyncOrchestrator:
             _ = self.db.log_sync(user_id, "error", weight_kg, body_fat_pct, str(exc))
             return SyncResult(status="skipped", user_id=user_id, message="garmin_rate_limited", skipped=1, total=1)
 
-    async def sync_user(self, user_id: str) -> SyncResult:
+    async def sync_user(self, user_id: str) -> SyncResult:  # noqa: PLR0911
+        profile = self.db.get_user_profile(user_id)
+        if profile and not getattr(profile, "sync_enabled", True):
+            logger.info("Automatic sync is disabled by user, skipping", user_id=user_id)
+            return SyncResult(status="skipped", user_id=user_id, message="sync_disabled_by_user", total=0)
+
         token = self.db.get_oauth_token(user_id, "google")
         session = self.db.has_garmin_session(user_id)
         prereq_error = self._validate_sync_prerequisites(user_id, token, session)

@@ -122,11 +122,56 @@ def create_connections_router(  # noqa: C901, PLR0915
         user_id = await require_user(request, jwt_secret, jwt_algorithm)
         expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
+        # Retrieve Google Health user ID
+        health_user_id = None
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                identity_resp = await client.get(
+                    "https://health.googleapis.com/v4/users/me/identity",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+                if identity_resp.status_code == 200:
+                    identity_data = identity_resp.json()
+                    health_user_id = identity_data.get("healthUserId")
+                else:
+                    logger.warning(
+                        "Failed to fetch Google Health identity",
+                        status=identity_resp.status_code,
+                        body=identity_resp.text,
+                    )
+        except Exception as exc:
+            logger.exception("Error fetching Google Health identity during callback", error=str(exc))
+
         if db_client is None:
             logger.warning("No db_client configured, skipping Google OAuth token save", user_id=user_id)
         else:
             _ = db_client.save_oauth_token(user_id, "google", access_token, refresh_token, expires_at)
+            if health_user_id:
+                _ = db_client.save_google_health_user_id(user_id, health_user_id)
 
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    @router.post("/toggle-sync")
+    async def toggle_sync(request: Request):
+        if db_client is None:
+            return Response(status_code=503, content="Database not configured")
+
+        try:
+            user_id = await require_user(request, jwt_secret, jwt_algorithm)
+        except HTTPException as exc:
+            if is_htmx(request) and "HX-Redirect" in (exc.headers or {}):
+                return Response(headers={"HX-Redirect": "/login"})
+            return RedirectResponse(url="/login", status_code=302)
+
+        form = await request.form()
+        enabled = form.get("sync_enabled") == "on"
+        await form.close()
+
+        _ = db_client.update_user_sync_enabled(user_id, enabled)
+        logger.info("Toggled sync status", user_id=user_id, sync_enabled=enabled)
+
+        if is_htmx(request):
+            return Response(headers={"HX-Redirect": "/dashboard"})
         return RedirectResponse(url="/dashboard", status_code=302)
 
     @router.post("/google/disconnect")

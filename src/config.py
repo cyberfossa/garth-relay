@@ -27,6 +27,7 @@ class AppConfig:
     google_client_id: str = environ.var(default="")
     google_client_secret: str = environ.var(default="")
     google_oauth_redirect_uri: str = environ.var(default="http://localhost:8080/auth/callback")
+    google_health_webhook_secret: str = environ.var(default="")
     polling_interval_hours: int = environ.var(default=1, converter=int)
     polling_enabled: bool = environ.bool_var(default=True)
 
@@ -38,6 +39,9 @@ def get_config() -> AppConfig:
         AppConfig instance with all settings loaded from APP_* env vars.
     """
     config = environ.to_config(AppConfig)
+
+    if not config.google_health_webhook_secret:
+        logger.warning("APP_GOOGLE_HEALTH_WEBHOOK_SECRET not set, webhooks will fail handshake verification")
 
     if not config.encryption_key:
         logger.warning("APP_ENCRYPTION_KEY not set, using auto-generated dev key (NOT for production)")
