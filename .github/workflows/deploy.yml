@@ -1,0 +1,70 @@
+name: Deploy to GCP Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual deployment from any branch via GitHub UI
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build & Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication
+        run: |
+          gcloud auth configure-docker ${{ vars.GCP_REGION || 'europe-west3' }}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ vars.GCP_REGION || 'europe-west3' }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ vars.GCP_APP_NAME || 'garth-relay' }}/${{ vars.GCP_APP_NAME || 'garth-relay' }}:${{ github.sha }}
+            ${{ vars.GCP_REGION || 'europe-west3' }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ vars.GCP_APP_NAME || 'garth-relay' }}/${{ vars.GCP_APP_NAME || 'garth-relay' }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Cloud Run
+        run: |
+          # 1. Deploy Cloud Run with secrets and initial environment variables
+          gcloud run deploy ${{ vars.GCP_APP_NAME || 'garth-relay' }} \
+            --image=${{ vars.GCP_REGION || 'europe-west3' }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ vars.GCP_APP_NAME || 'garth-relay' }}/${{ vars.GCP_APP_NAME || 'garth-relay' }}:${{ github.sha }} \
+            --region=${{ vars.GCP_REGION || 'europe-west3' }} \
+            --service-account=${{ vars.GCP_APP_NAME || 'garth-relay' }}-runner@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --allow-unauthenticated \
+            --set-secrets="APP_ENCRYPTION_KEY=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_ENCRYPTION_KEY:latest,APP_JWT_SECRET_KEY=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_JWT_SECRET_KEY:latest,APP_CSRF_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_CSRF_SECRET:latest,APP_GOOGLE_CLIENT_ID=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_CLIENT_ID:latest,APP_GOOGLE_CLIENT_SECRET=${{ vars.GCP_APP_NAME || 'garth-relay' }}-APP_GOOGLE_CLIENT_SECRET:latest" \
+            --set-env-vars="APP_GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" \
+            --quiet
+
+          # 2. Retrieve the deployed service URL
+          SERVICE_URL=$(gcloud run services describe ${{ vars.GCP_APP_NAME || 'garth-relay' }} \
+            --region=${{ vars.GCP_REGION || 'europe-west3' }} \
+            --format='value(status.url)')
+
+          # 3. Update the service with the dynamic Redirect URI based on its own URL
+          gcloud run services update ${{ vars.GCP_APP_NAME || 'garth-relay' }} \
+            --region=${{ vars.GCP_REGION || 'europe-west3' }} \
+            --update-env-vars="APP_GOOGLE_OAUTH_REDIRECT_URI=${SERVICE_URL}/auth/callback" \
+            --quiet
