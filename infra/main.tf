@@ -71,6 +71,23 @@ resource "google_firestore_field" "oauth_states_ttl" {
   ttl_config {}
 }
 
+# Composite index for querying the latest successful sync log
+resource "google_firestore_index" "sync_logs_index" {
+  project    = var.project_id
+  database   = google_firestore_database.database.name
+  collection = "sync_logs"
+
+  fields {
+    field_path = "status"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "timestamp"
+    order      = "DESCENDING"
+  }
+}
+
 # --- 4. Secret Manager Placeholders ---
 locals {
   secret_names = [
