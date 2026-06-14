@@ -1,6 +1,14 @@
-# Garth Relay
+<p align="center">
+  <img src="src/static/logo.png" width="180" alt="Garth Relay Logo">
+</p>
 
-Relay health metrics from external sources to Garmin Connect using [garth](https://github.com/cyberfossa/garth-ng).
+<h1 align="center">Garth Relay</h1>
+
+<p align="center">
+  <strong>A lightweight, self-hosted FastAPI service to relay health metrics (such as weight and blood pressure) to Garmin Connect.</strong>
+  <br>
+  <i>Leverages the power of <a href="https://github.com/cyberfossa/garth-ng">garth</a> to securely synchronize fitness and health records.</i>
+</p>
 
 ---
 
