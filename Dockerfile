@@ -16,9 +16,12 @@ FROM python:3.12-slim-bookworm AS runtime
 
 WORKDIR /app
 
+ARG GIT_SHA
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    GIT_SHA=$GIT_SHA
+
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app/src /app/src
