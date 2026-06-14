@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import secrets
 from datetime import UTC, datetime, timedelta
@@ -20,6 +21,7 @@ from src.routes.connections_helpers import is_htmx, require_user
 from src.services.garmin_client import GarminClient, GarminRateLimitError, GarminSessionExpiredError
 from src.services.google_health_client import GOOGLE_HEALTH_SCOPE
 from src.services.oauth_state_store import OAuthStateStore
+from src.services.omron_client import OmronClient
 
 logger = structlog.get_logger()
 
@@ -32,6 +34,21 @@ class _GarminAuthDB(Protocol):
     def delete_mfa_state(self, user_id: str) -> bool: ...
 
     def delete_garmin_session(self, user_id: str) -> bool: ...
+
+
+def _redirect_to(url: str, request: Request) -> Response:
+    if is_htmx(request):
+        return Response(headers={"HX-Redirect": url})
+    return RedirectResponse(url=url, status_code=302)
+
+
+async def _authenticate_request(request: Request, jwt_secret: str, jwt_algorithm: str) -> str | Response:
+    try:
+        return await require_user(request, jwt_secret, jwt_algorithm)
+    except HTTPException as exc:
+        if is_htmx(request) and "HX-Redirect" in (exc.headers or {}):
+            return Response(headers={"HX-Redirect": "/login"})
+        return RedirectResponse(url="/login", status_code=302)
 
 
 def create_connections_router(  # noqa: C901, PLR0915
@@ -188,6 +205,90 @@ def create_connections_router(  # noqa: C901, PLR0915
         if is_htmx(request):
             return Response(headers={"HX-Redirect": "/dashboard"})
         return RedirectResponse(url="/dashboard", status_code=302)
+
+    @router.post("/omron/connect")
+    async def omron_connect(request: Request):
+        if db_client is None:
+            return Response(status_code=503, content="Database not configured")
+
+        auth_res = await _authenticate_request(request, jwt_secret, jwt_algorithm)
+        if isinstance(auth_res, Response):
+            return auth_res
+        user_id = auth_res
+
+        form = await request.form()
+        email = str(form.get("email", "")).strip()
+        password = str(form.get("password", "")).strip()
+        region = str(form.get("region", "EMEA")).strip()
+        user_slot_str = str(form.get("user_slot", "1")).strip()
+        await form.close()
+
+        if not email or not password:
+            return HTMLResponse('<p class="error">Email and password are required.</p>', status_code=400)
+
+        try:
+            user_slot = int(user_slot_str)
+        except ValueError:
+            user_slot = 1
+
+        try:
+            client = OmronClient(region=region)
+            tokens = await asyncio.to_thread(client.login, email=email, password=password)
+            if not tokens:
+                return HTMLResponse('<p class="error">Incorrect email or password, or invalid region.</p>', status_code=400)
+
+            access_token, refresh_token, expires_at = tokens
+            _ = db_client.save_omron_tokens(
+                user_id=user_id,
+                email=email,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_at=expires_at,
+                region=region,
+                user_slot=user_slot,
+                encryptor=encryptor,
+            )
+            _ = db_client.update_user_omron_sync_enabled(user_id, True)
+
+            logger.info("Omron Connected successfully", user_id=user_id)
+            return _redirect_to("/dashboard", request)
+
+        except Exception as exc:
+            logger.exception("Omron connection failed for user %s: %s", user_id, exc)
+            return HTMLResponse(f'<p class="error">Omron connection failed: {exc}</p>', status_code=500)
+
+    @router.post("/omron/disconnect")
+    async def omron_disconnect(request: Request):
+        if db_client is None:
+            return Response(status_code=503, content="Database not configured")
+
+        auth_res = await _authenticate_request(request, jwt_secret, jwt_algorithm)
+        if isinstance(auth_res, Response):
+            return auth_res
+        user_id = auth_res
+
+        _ = db_client.delete_omron_tokens(user_id)
+        _ = db_client.update_user_omron_sync_enabled(user_id, False)
+        logger.info("Omron disconnected", user_id=user_id)
+        return _redirect_to("/dashboard", request)
+
+    @router.post("/omron/toggle-sync")
+    async def omron_toggle_sync(request: Request):
+        if db_client is None:
+            return Response(status_code=503, content="Database not configured")
+
+        auth_res = await _authenticate_request(request, jwt_secret, jwt_algorithm)
+        if isinstance(auth_res, Response):
+            return auth_res
+        user_id = auth_res
+
+        form = await request.form()
+        enabled = form.get("omron_sync_enabled") == "on"
+        await form.close()
+
+        _ = db_client.update_user_omron_sync_enabled(user_id, enabled)
+        logger.info("Toggled Omron sync status", user_id=user_id, omron_sync_enabled=enabled)
+        return _redirect_to("/dashboard", request)
 
     # ── Garmin routes ──────────────────────────────────────────────────────
 

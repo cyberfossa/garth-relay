@@ -46,6 +46,10 @@ def garmin_client() -> MagicMock:
 def db_client() -> MagicMock:
     client = MagicMock()
     client.db = MagicMock()
+    profile = MagicMock()
+    profile.omron_sync_enabled = False
+    profile.sync_enabled = True
+    client.get_user_profile.return_value = profile
     return client
 
 

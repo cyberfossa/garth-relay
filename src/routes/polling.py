@@ -28,6 +28,14 @@ SYNC_MESSAGE_MAP: dict[str, tuple[str, str]] = {
     "google_auth_error": ("error", "Google Health authentication error"),
     "google_scope_revoked": ("error", "Google Health access was revoked — please reconnect"),
     "unexpected_error": ("error", "An unexpected error occurred"),
+    "missing_omron_tokens": ("error", "Omron Connect is not connected"),
+    "omron_session_expired": ("error", "Omron Connect session expired — please reconnect"),
+    "omron_auth_failed": ("error", "Omron Connect authentication failed"),
+    "no_bpm_devices": ("info", "No blood pressure devices registered in Omron Connect"),
+    "omron_device_fetch_failed": ("error", "Failed to fetch Omron devices"),
+    "omron_measurement_fetch_failed": ("error", "Failed to fetch Omron measurements"),
+    "garmin_fetch_failed": ("error", "Failed to fetch Garmin blood pressures"),
+    "garmin_upload_failed": ("error", "Failed to upload blood pressures to Garmin"),
 }
 
 
@@ -146,6 +154,8 @@ def create_polling_router(  # noqa: C901
 
         logger.info("sync_now triggered", user_id=user_id)
 
+        notices: list[str] = []
+
         try:
             result = await sync_orchestrator.sync_user(user_id)
             result_type, message = _format_sync_message(
@@ -154,12 +164,27 @@ def create_polling_router(  # noqa: C901
                 skipped=result.skipped,
                 total=result.total,
             )
+            notices.append(_sync_result_html(result_type, f"Váha: {message}"))
         except Exception:
-            logger.exception("Unexpected error in sync_now for user %s", user_id)
-            result_type = "error"
-            message = "An unexpected error occurred"
+            logger.exception("Unexpected error in sync_now weight sync for user %s", user_id)
+            notices.append(_sync_result_html("error", "Váha: Došlo k neočekávané chybě"))
 
-        return HTMLResponse(_sync_result_html(result_type, message))
+        try:
+            profile = db_client.get_user_profile(user_id)
+            if profile and getattr(profile, "omron_sync_enabled", False):
+                omron_result = await sync_orchestrator.sync_omron_user(user_id)
+                omron_type, omron_message = _format_sync_message(
+                    omron_result.message,
+                    uploaded=omron_result.uploaded,
+                    skipped=omron_result.skipped,
+                    total=omron_result.total,
+                )
+                notices.append(_sync_result_html(omron_type, f"Krevní tlak: {omron_message}"))
+        except Exception:
+            logger.exception("Unexpected error in sync_now Omron sync for user %s", user_id)
+            notices.append(_sync_result_html("error", "Krevní tlak: Došlo k neočekávané chybě"))
+
+        return HTMLResponse("\n".join(notices))
 
     @router.get("/sync-logs")
     async def sync_logs(request: Request):

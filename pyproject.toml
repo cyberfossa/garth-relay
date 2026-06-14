@@ -29,6 +29,7 @@ dependencies = [
     "httpx>=0.28",
     "garth-ng>=2.0.0a0",
     "tink>=1.15.0",
+    "pytz>=2026.2",
 ]
 
 [project.optional-dependencies]

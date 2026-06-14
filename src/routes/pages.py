@@ -59,6 +59,7 @@ def create_pages_router(
         user_profile = None
         google_connected = False
         garmin_connected = False
+        omron_connected = False
         recent_syncs = []
 
         if db_client:
@@ -66,6 +67,7 @@ def create_pages_router(
             google_token = db_client.get_oauth_token(user_id, "google")
             garmin_connected = db_client.has_garmin_session(user_id)
             google_connected = google_token is not None
+            omron_connected = db_client.has_omron_connection(user_id)
             recent_syncs = db_client.get_recent_syncs(user_id, limit=10)
 
         return templates.TemplateResponse(
@@ -77,6 +79,7 @@ def create_pages_router(
                 "user_profile": user_profile,
                 "google_connected": google_connected,
                 "garmin_connected": garmin_connected,
+                "omron_connected": omron_connected,
                 "recent_syncs": recent_syncs,
             },
         )

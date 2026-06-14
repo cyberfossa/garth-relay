@@ -48,41 +48,81 @@
                         <br><a href="/connections/garmin/connect" role="button" class="outline" style="margin-top: 0.5rem; display: inline-block;">Connect Garmin</a>
                         {% endif %}
                     </li>
+                    <li>
+                        Omron Connect: 
+                        {% if omron_connected %}
+                        <span style="color: var(--pico-ins-color);">&#10003; Connected</span>
+                        <br>
+                        <form hx-post="/connections/omron/disconnect"
+                              hx-target="#connections-section"
+                              hx-swap="innerHTML"
+                              hx-confirm="Disconnect Omron Connect?"
+                              style="display: inline-block; margin-top: 0.5rem;">
+                            {{ csrf_hidden_field(request) | safe }}
+                            <button type="submit" class="secondary outline">Disconnect</button>
+                        </form>
+                        {% else %}
+                        <span style="color: var(--pico-del-color);">&#10007; Not connected</span>
+                        <br>
+                        <button class="outline" onclick="document.getElementById('omron-modal').showModal()" style="margin-top: 0.5rem; display: inline-block;">Connect Omron</button>
+                        {% endif %}
+                    </li>
                 </ul>
             </div>
         </section>
-
+ 
         <section>
             <h3>Sync Data</h3>
-            {% if google_connected and garmin_connected %}
-            <form style="margin-bottom: 1rem;">
-                {{ csrf_hidden_field(request) | safe }}
-                <label for="sync_enabled">
-                    <input type="checkbox" id="sync_enabled" name="sync_enabled" role="switch"
-                           {% if user_profile and user_profile.sync_enabled %}checked{% endif %}
-                           hx-post="/connections/toggle-sync"
-                           hx-trigger="change">
-                    Automatic Synchronization
-                </label>
-            </form>
-
-            <form hx-post="/polling/sync-now" hx-target="#sync-result" hx-swap="innerHTML" hx-indicator="#sync-spinner" style="margin-top: 1rem;">
-                {{ csrf_hidden_field(request) | safe }}
-                <button type="submit">Sync Now</button>
-            </form>
-            <p style="margin-top: 0.75rem;">
-                <a href="/sync/weight" role="button" class="secondary outline">Manual Sync</a>
-            </p>
-            <div id="sync-spinner" class="htmx-indicator" style="margin-top: 1rem;">
-                <p>Syncing data... Please wait.</p>
-            </div>
-            <div id="sync-result" style="margin-top: 1rem;"></div>
+            {% if garmin_connected %}
+                <div style="margin-bottom: 1rem;">
+                    {% if google_connected %}
+                    <form style="margin-bottom: 0.5rem;">
+                        {{ csrf_hidden_field(request) | safe }}
+                        <label for="sync_enabled">
+                            <input type="checkbox" id="sync_enabled" name="sync_enabled" role="switch"
+                                   {% if user_profile and user_profile.sync_enabled %}checked{% endif %}
+                                   hx-post="/connections/toggle-sync"
+                                   hx-trigger="change">
+                            Google Health (Weight) Auto-Sync
+                        </label>
+                    </form>
+                    {% endif %}
+ 
+                    {% if omron_connected %}
+                    <form style="margin-bottom: 0.5rem;">
+                        {{ csrf_hidden_field(request) | safe }}
+                        <label for="omron_sync_enabled">
+                            <input type="checkbox" id="omron_sync_enabled" name="omron_sync_enabled" role="switch"
+                                   {% if user_profile and user_profile.omron_sync_enabled %}checked{% endif %}
+                                   hx-post="/connections/omron/toggle-sync"
+                                   hx-trigger="change">
+                            Omron Connect (Blood Pressure) Auto-Sync
+                        </label>
+                    </form>
+                    {% endif %}
+                </div>
+ 
+                {% if google_connected or omron_connected %}
+                <form hx-post="/polling/sync-now" hx-target="#sync-result" hx-swap="innerHTML" hx-indicator="#sync-spinner" style="margin-top: 1rem;">
+                    {{ csrf_hidden_field(request) | safe }}
+                    <button type="submit">Sync Now</button>
+                </form>
+                <p style="margin-top: 0.75rem;">
+                    <a href="/sync/weight" role="button" class="secondary outline">Manual Weight Sync</a>
+                </p>
+                <div id="sync-spinner" class="htmx-indicator" style="margin-top: 1rem;">
+                    <p>Syncing data... Please wait.</p>
+                </div>
+                <div id="sync-result" style="margin-top: 1rem;"></div>
+                {% else %}
+                <p>Connect Google Health or Omron Connect to start syncing your health metrics.</p>
+                {% endif %}
             {% else %}
-            <p>Connect both Google Health and Garmin Connect to start syncing your body measurements.</p>
+            <p>Connect Garmin Connect to start syncing your body measurements.</p>
             {% endif %}
         </section>
     </div>
-
+ 
     <section>
         <h3>Recent Sync Logs</h3>
         <div id="sync-logs">
@@ -119,4 +159,43 @@
         </div>
     </section>
 </article>
+
+<dialog id="omron-modal">
+    <article>
+        <header>
+            <button aria-label="Close" rel="prev" onclick="document.getElementById('omron-modal').close()"></button>
+            <h3>Connect Omron Connect</h3>
+        </header>
+        <form method="post" action="/connections/omron/connect">
+            {{ csrf_hidden_field(request) | safe }}
+            
+            <label for="omron_email">Email</label>
+            <input type="email" id="omron_email" name="email" required placeholder="name@example.com">
+            
+            <label for="omron_password">Password</label>
+            <input type="password" id="omron_password" name="password" required>
+            <small style="display:block; margin-bottom:1rem;">We do NOT store your password. It is only used to acquire exchangeable API access tokens and then discarded.</small>
+ 
+            <label for="omron_region">Region</label>
+            <select id="omron_region" name="region">
+                <option value="EMEA" selected>Europe / Middle East / Africa (EMEA)</option>
+                <option value="US">North America / US</option>
+                <option value="AP">Asia / Pacific (AP)</option>
+            </select>
+ 
+            <label for="omron_user_slot">User Slot on Device</label>
+            <select id="omron_user_slot" name="user_slot">
+                <option value="1" selected>User 1</option>
+                <option value="2">User 2</option>
+                <option value="3">User 3</option>
+                <option value="4">User 4</option>
+            </select>
+            
+            <footer>
+                <button type="button" class="secondary outline" onclick="document.getElementById('omron-modal').close()">Cancel</button>
+                <button type="submit" style="float: right;">Connect</button>
+            </footer>
+        </form>
+    </article>
+</dialog>
 {% endblock %}
