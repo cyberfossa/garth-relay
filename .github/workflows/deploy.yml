@@ -68,3 +68,19 @@ jobs:
             --region=${{ vars.GCP_REGION || 'europe-west3' }} \
             --update-env-vars="APP_GOOGLE_OAUTH_REDIRECT_URI=${SERVICE_URL}/auth/callback" \
             --quiet
+
+      - name: Cleanup old Cloud Run revisions
+        run: |
+          # Keep the 5 most recent revisions, delete the rest
+          REVISIONS=$(gcloud run revisions list \
+            --service=${{ vars.GCP_APP_NAME || 'garth-relay' }} \
+            --region=${{ vars.GCP_REGION || 'europe-west3' }} \
+            --sort-by="~creationTimestamp" \
+            --format="value(name)" | tail -n +6)
+
+          for REV in $REVISIONS; do
+            echo "Deleting old revision: $REV"
+            gcloud run revisions delete "$REV" \
+              --region=${{ vars.GCP_REGION || 'europe-west3' }} \
+              --quiet || true
+          done
