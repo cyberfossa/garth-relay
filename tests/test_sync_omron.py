@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import pytz
 
-from src.services.sync_orchestrator import SyncOrchestrator, SyncResult
-from src.services.garmin_client import GarminRateLimitError, GarminSessionExpiredError
+from src.services.garmin_client import GarminRateLimitError
 from src.services.omron_client import BPMeasurement, DeviceCategory, OmronDevice
+from src.services.sync_orchestrator import SyncOrchestrator
 
 
 @pytest.fixture
@@ -97,7 +97,7 @@ class TestFetchOmronBPMeasurements:
         mock_client = MagicMock()
         mock_device = OmronDevice(name="BPM 1", macaddr="mac-1", category=DeviceCategory.BPM, user=1)
         mock_client.get_registered_devices.return_value = [mock_device]
-        
+
         m1 = _bp_measurement()
         mock_client.get_measurements.return_value = [m1]
 
@@ -113,7 +113,7 @@ class TestFetchOmronBPMeasurements:
         mock_client = MagicMock()
         mock_client.get_registered_devices.return_value = []
         mock_client.servers = ["https://vlt-mobile-api.prd.eu.ohiomron.eu/prd"]
-        
+
         m1 = _bp_measurement()
         mock_client.get_measurements.return_value = [m1]
 

@@ -235,7 +235,9 @@ def create_connections_router(  # noqa: C901, PLR0915
             client = OmronClient(region=region)
             tokens = await asyncio.to_thread(client.login, email=email, password=password)
             if not tokens:
-                return HTMLResponse('<p class="error">Incorrect email or password, or invalid region.</p>', status_code=400)
+                return HTMLResponse(
+                    '<p class="error">Incorrect email or password, or invalid region.</p>', status_code=400
+                )
 
             access_token, refresh_token, expires_at = tokens
             _ = db_client.save_omron_tokens(
