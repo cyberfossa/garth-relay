@@ -1,4 +1,33 @@
-"""Omron Connect API client implementation supporting both v1 and v2 regional APIs."""
+"""Omron Connect API client implementation supporting both v1 and v2 regional APIs.
+
+CREDENTIALS & LICENSE ATTRIBUTION:
+This implementation contains logic and constants for interacting with Omron Connect APIs
+(both v1 Kii Cloud and v2 direct APIs) inspired by the open-source project 'bugficks/omramin'
+(licensed under the GNU General Public License v2.0 - GPL-2.0).
+
+API v1 Kii-Cloud App IDs and Keys listed below are reverse-engineered from the official
+Omron Connect mobile applications and are necessary for API interoperability:
+
+- SG (Singapore / Asia Pacific):
+    App ID: lou30y2xfa9f
+    App Key: 392a4bdff8af4141944d30ca8e3cc860
+- JP (Japan):
+    App ID: 1e3ddd17
+    App Key: b576cf704409ec86facdacc16fbaadad
+- IN (India):
+    App ID: cuoy728n
+    App Key: 784uhaescyzyc28l2yh8xsth1xpga21g
+- EU (Europe / EMEA):
+    App ID: bfyy2kf1d5a0
+    App Key: 989c6dbdc0244886ac2ba4de4892080e
+
+License Warning:
+The reference project 'bugficks/omramin' is licensed under GPL-2.0. Because this file
+provides interoperability with the same proprietary API endpoints, it incorporates those
+same protocol definitions and reverse-engineered keys. Developers using or distributing
+this code should evaluate compatibility between the MIT license of garth-relay and the
+GPL-2.0 license of the reference project.
+"""
 
 from __future__ import annotations
 
