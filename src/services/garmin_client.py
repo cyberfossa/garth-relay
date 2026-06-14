@@ -142,6 +142,14 @@ class GarminClient:
                 utc_dt = timestamp.astimezone(UTC)
                 local_dt = timestamp
 
+            for name, val, lo, hi in (
+                ("systolic", systolic, 70, 260),
+                ("diastolic", diastolic, 40, 150),
+                ("pulse", pulse, 20, 250),
+            ):
+                if not isinstance(val, int) or not (lo <= val <= hi):
+                    raise ValueError(f"{name} must be an int in [{lo}, {hi}]")
+
             payload = {
                 "measurementTimestampLocal": local_dt.strftime("%Y-%m-%dT%H:%M:%S.000"),
                 "measurementTimestampGMT": utc_dt.strftime("%Y-%m-%dT%H:%M:%S.000"),
@@ -151,14 +159,6 @@ class GarminClient:
                 "sourceType": "MANUAL",
                 "notes": notes or "",
             }
-
-            for name, val, lo, hi in (
-                ("systolic", systolic, 70, 260),
-                ("diastolic", diastolic, 40, 150),
-                ("pulse", pulse, 20, 250),
-            ):
-                if not isinstance(val, int) or not (lo <= val <= hi):
-                    raise ValueError(f"{name} must be an int in [{lo}, {hi}]")
 
             logger.info("Uploading blood pressure to Garmin", payload=payload)
             await asyncio.to_thread(

@@ -166,8 +166,9 @@
             <button aria-label="Close" rel="prev" onclick="document.getElementById('omron-modal').close()"></button>
             <h3>Connect Omron Connect</h3>
         </header>
-        <form method="post" action="/connections/omron/connect">
+        <form hx-post="/connections/omron/connect" hx-target="#omron-connect-error" hx-swap="innerHTML">
             {{ csrf_hidden_field(request) | safe }}
+            <div id="omron-connect-error"></div>
             
             <label for="omron_email">Email</label>
             <input type="email" id="omron_email" name="email" required placeholder="name@example.com">

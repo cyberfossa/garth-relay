@@ -22,6 +22,14 @@ logger = structlog.get_logger()
 SYNC_WINDOW_DAYS = 7
 DEDUP_TOLERANCE_MINUTES = 5
 
+# Czech localization strings for sync notes
+# Note: The application's user-facing logs and dashboard are Czech by design.
+OMRON_SYNC_PREFIX = "Sync z Omron Connect."
+IRREGULAR_PULSE_YES = "Nepravidelný puls: Ano"
+IRREGULAR_PULSE_NO = "Nepravidelný puls: Ne"
+MOVEMENT_DETECT_YES = "Pohyb při měření: Ano"
+MOVEMENT_DETECT_NO = "Pohyb při měření: Ne"
+
 
 @dataclass
 class SyncResult:
@@ -229,7 +237,7 @@ class SyncOrchestrator:
         return uploaded, skipped, None
 
     async def _authenticate_omron(
-        self, user_id: str, omron_tokens: dict
+        self, user_id: str, omron_tokens: dict[str, Any]
     ) -> tuple[OmronClient | None, SyncResult | None]:
         try:
             client = OmronClient(region=omron_tokens["region"])
@@ -269,7 +277,7 @@ class SyncOrchestrator:
             if devices:
                 bpm_devices = [d for d in devices if d.category == DeviceCategory.BPM and d.user == user_slot]
 
-            if not bpm_devices and client.servers[0] not in ["https://data-sg.omronconnect.com/api"]:
+            if not bpm_devices and client.supports_virtual_bpm():
                 bpm_devices = [
                     OmronDevice(
                         name="Virtual BPM",
@@ -323,7 +331,7 @@ class SyncOrchestrator:
         self, omron_bps: list[BPMeasurement], existing_bps: list[dict[str, Any]]
     ) -> list[BPMeasurement]:
         new_measurements = []
-        tolerance = timedelta(minutes=5)
+        tolerance = timedelta(minutes=DEDUP_TOLERANCE_MINUTES)
 
         for omron_m in omron_bps:
             omron_ts = omron_m.measurementDate / 1000
@@ -355,16 +363,16 @@ class SyncOrchestrator:
             for m in bps:
                 flags = []
                 if m.irregularHB:
-                    flags.append("Nepravidelný puls: Ano")
+                    flags.append(IRREGULAR_PULSE_YES)
                 else:
-                    flags.append("Nepravidelný puls: Ne")
+                    flags.append(IRREGULAR_PULSE_NO)
 
                 if m.movementDetect:
-                    flags.append("Pohyb při měření: Ano")
+                    flags.append(MOVEMENT_DETECT_YES)
                 else:
-                    flags.append("Pohyb při měření: Ne")
+                    flags.append(MOVEMENT_DETECT_NO)
 
-                notes = f"Sync z Omron Connect. {', '.join(flags)}"
+                notes = f"{OMRON_SYNC_PREFIX} {', '.join(flags)}"
                 dt_local = datetime.fromtimestamp(m.measurementDate / 1000, tz=m.timeZone)
 
                 await garmin.upload_blood_pressure(
@@ -388,17 +396,15 @@ class SyncOrchestrator:
             _ = self.db.log_sync(user_id, "error", error_message=f"Garmin upload failed: {exc}")
             return uploaded, SyncResult(status="error", user_id=user_id, message="garmin_upload_failed")
 
-    def _validate_omron_sync_prerequisites(
-        self, user_id: str, omron_tokens: dict | None, session: bool
-    ) -> SyncResult | None:
+    def _validate_omron_sync_prerequisites(self, user_id: str, omron_tokens: dict | None, session: bool) -> str | None:
         if not omron_tokens:
             _ = self.db.update_user_status(user_id, "needs_reauth")
             _ = self.db.log_sync(user_id, "error", error_message="Missing Omron Connect connection")
-            return SyncResult(status="error", user_id=user_id, message="missing_omron_tokens")
+            return "missing_omron_tokens"
         if not session:
             _ = self.db.update_user_status(user_id, "needs_reauth")
             _ = self.db.log_sync(user_id, "error", error_message="Missing Garmin connection")
-            return SyncResult(status="error", user_id=user_id, message="missing_garmin_session")
+            return "missing_garmin_session"
         return None
 
     async def sync_omron_user(self, user_id: str) -> SyncResult:
@@ -406,7 +412,7 @@ class SyncOrchestrator:
         session = self.db.has_garmin_session(user_id)
         prereq_error = self._validate_omron_sync_prerequisites(user_id, omron_tokens, session)
         if prereq_error:
-            return prereq_error
+            return SyncResult(status="error", user_id=user_id, message=prereq_error)
 
         assert omron_tokens is not None
 

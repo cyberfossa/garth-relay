@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 
 from src.services.garmin_client import GarminRateLimitError
 from src.services.omron_client import BPMeasurement, DeviceCategory, OmronDevice
@@ -47,7 +47,7 @@ def _bp_measurement(
         measurementDate=timestamp_ms,
         irregularHB=False,
         movementDetect=False,
-        timeZone=pytz.timezone(tz_name),
+        timeZone=ZoneInfo(tz_name),
     )
 
 
@@ -89,6 +89,7 @@ class TestAuthenticateOmron:
         assert error.status == "error"
         assert error.message == "omron_session_expired"
         db_client.update_user_status.assert_called_once_with("u1", "needs_reauth")
+        db_client.log_sync.assert_called_once_with("u1", "error", error_message="Omron Connect session expired")
 
 
 class TestFetchOmronBPMeasurements:
@@ -197,4 +198,6 @@ class TestSyncOmronUser:
         assert result.uploaded == 1
         assert result.skipped == 0
         assert result.total == 1
-        db_client.log_sync.assert_called_once()
+        db_client.log_sync.assert_called_once_with(
+            "u1", "success", error_message="Omron sync: uploaded=1 skipped=0 total=1"
+        )

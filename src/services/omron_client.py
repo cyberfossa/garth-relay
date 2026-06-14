@@ -41,9 +41,9 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, fields
 from decimal import Decimal
 from typing import Any, get_type_hints
+from zoneinfo import ZoneInfo
 
 import httpx
-import pytz
 from httpx import HTTPStatusError
 
 logger = logging.getLogger("omronconnect")
@@ -107,7 +107,7 @@ def _coerce_dataclass_fields(self: Any) -> None:
         field_type = type_hints[field.name]
         if field_type == datetime.tzinfo:
             if not isinstance(attr, datetime.tzinfo):
-                object.__setattr__(self, field.name, pytz.timezone(attr) if isinstance(attr, str) else attr)
+                object.__setattr__(self, field.name, ZoneInfo(attr) if isinstance(attr, str) else attr)
         else:
             object.__setattr__(self, field.name, field_type(attr))
 
@@ -297,7 +297,7 @@ class OmronConnect(ABC):
 class OmronConnect1(OmronConnect):
     _OGSC_APP_VERSION = "011.004.00000"
     _OGSC_SDK_VERSION = "000.005"
-    _USER_AGENT = f"OmronConnect/{_OGSC_APP_VERSION}.001 CFNetwork/1335.0.3.4 Darwin/21.6.0)"
+    _USER_AGENT = f"OmronConnect/{_OGSC_APP_VERSION}.001 (CFNetwork/1335.0.3.4; Darwin/21.6.0)"
 
     def __init__(self, server: str, country: str):
         self._server = server
@@ -495,7 +495,7 @@ class OmronConnect1(OmronConnect):
             bodymotion = bodyIndexList[ValueType.BODY_MOTION_FLAG_FIGURE].value
             irregHB = bodyIndexList[ValueType.ARRHYTHMIA_FLAG_FIGURE].value
             cuffWrapGuid = bodyIndexList[ValueType.KEEP_UP_CHECK_FIGURE].value
-            timeZone = pytz.timezone(m["timeZone"])
+            timeZone = ZoneInfo(m["timeZone"])
 
             bp = BPMeasurement(
                 systolic=systolic,
@@ -542,7 +542,7 @@ class OmronConnect1(OmronConnect):
                 bodyIndexList[ValueType.BMI_FIGURE].value,
                 bodyIndexList[ValueType.BMI_FIGURE].scale,
             )
-            timeZone = pytz.timezone(m["timeZone"])
+            timeZone = ZoneInfo(m["timeZone"])
 
             wm = WeightMeasurement(
                 weight=weight,
@@ -708,7 +708,7 @@ class OmronConnect2(OmronConnect):
                         diastolic=m["diastolic"],
                         pulse=m["pulse"],
                         measurementDate=measurementDate,
-                        timeZone=pytz.FixedOffset(int(m["timeZone"]) // 60),
+                        timeZone=datetime.timezone(datetime.timedelta(minutes=int(m["timeZone"]) // 60)),
                         irregularHB=int(m["irregularHB"]) != 0,
                         movementDetect=int(m["movementDetect"]) != 0,
                         cuffWrapDetect=int(m["cuffWrapDetect"]) != 0,
@@ -723,7 +723,7 @@ class OmronConnect2(OmronConnect):
                     wm = WeightMeasurement(
                         weight=weight,
                         measurementDate=measurementDate,
-                        timeZone=pytz.FixedOffset(int(m["timeZone"]) // 60),
+                        timeZone=datetime.timezone(datetime.timedelta(minutes=int(m["timeZone"]) // 60)),
                         bmiValue=m["bmiValue"],
                         bodyFatPercentage=m["bodyFatPercentage"],
                         restingMetabolism=m["restingMetabolism"],
@@ -794,3 +794,7 @@ class OmronClient:
         if not self._active_client:
             raise RuntimeError("Not connected - call login() or refresh_oauth2() first")
         return self._active_client.get_measurements(device, searchDateFrom, searchDateTo)
+
+    def supports_virtual_bpm(self) -> bool:
+        """Return True if the region/server configuration supports virtual BPM devices (i.e. is not the AP/Asia region)."""
+        return not any("data-sg" in s for s in self.servers)
