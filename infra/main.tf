@@ -213,3 +213,70 @@ resource "google_service_account_iam_member" "github_actions_act_as_runner" {
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.github_actions_sa.email}"
 }
+
+# --- 7. Cloud Run Service ---
+resource "google_cloud_run_v2_service" "app" {
+  name     = var.app_name
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.cloud_run_sa.email
+
+    containers {
+      image = "us-docker.pkg.dev/cloudrun/container/hello" # bootstrap image, overridden by CI
+
+      ports {
+        container_port = 8080
+      }
+
+      env {
+        name  = "APP_GCP_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name  = "APP_GOOGLE_OAUTH_REDIRECT_URI"
+        value = var.app_url != "" ? "${var.app_url}/auth/callback" : ""
+      }
+
+      # Secrets mapped as environment variables from Secret Manager
+      dynamic "env" {
+        for_each = toset(local.secret_names)
+        content {
+          name = env.value
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.secrets[env.value].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+    ]
+  }
+
+  # Ensure APIs, database, secrets and permissions are ready first
+  depends_on = [
+    google_project_service.enabled_apis,
+    google_firestore_database.database,
+    google_secret_manager_secret.secrets,
+    google_secret_manager_secret_iam_member.secret_access,
+  ]
+}
+
+# Allow public unauthenticated access to the Cloud Run service
+resource "google_cloud_run_v2_service_iam_member" "public_access" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.app.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+

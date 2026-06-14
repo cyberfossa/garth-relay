@@ -19,3 +19,10 @@ variable "app_name" {
   type        = string
   default     = "garth-relay"
 }
+
+variable "app_url" {
+  description = "The public URL of the Cloud Run service (e.g. 'https://garth-relay-xxxx.a.run.app'). Leave empty for initial bootstrap."
+  type        = string
+  default     = ""
+}
+
