@@ -5,3 +5,5 @@ github_repository = "your-github-username/your-forked-repo-name"
 # Optional variables (uncomment and modify if needed)
 # region          = "europe-west3" # Default: europe-west3
 # app_name        = "garth-relay"  # Default: garth-relay
+# app_url         = "https://your-cloud-run-url.a.run.app" # Required for Google OAuth Redirect URI, leave empty for initial bootstrap
+

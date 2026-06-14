@@ -94,6 +94,7 @@ project_id        = "your-gcp-project-id"
 github_repository = "your-github-username/your-forked-repo-name"
 # region          = "europe-west3" # Optional, defaults to europe-west3
 # app_name        = "garth-relay"  # Optional, defaults to garth-relay
+# app_url         = ""             # Leave empty for initial bootstrap. Set to your service URL afterwards.
 ```
 
 Initialize and apply the Terraform configuration:
@@ -102,7 +103,7 @@ terraform init
 terraform apply
 ```
 
-This will output the values needed for GitHub Actions configuration (like `wif_provider_name` and `github_actions_sa_email`).
+This will output the values needed for GitHub Actions configuration (like `wif_provider_name` and `github_actions_sa_email`), as well as create the Cloud Run service running a public dummy hello-world container. Note down the generated service URL.
 
 ### 2. Generate and Configure Secrets
 
@@ -126,9 +127,16 @@ Run these commands in your local terminal to generate secure random keys:
 4. Name your client (e.g., `Garth Relay Client`).
 5. Under **Authorized redirect URIs**, add your redirect URLs:
    - For local development (optional): `http://localhost:8080/auth/callback` and `http://localhost:8080/connections/google/callback`
-   - For Cloud Run (once deployed): `https://<YOUR-CLOUD-RUN-URL>/auth/callback` and `https://<YOUR-CLOUD-RUN-URL>/connections/google/callback`
-   *(Note: You can deploy the service first, get the URL, and then add these URIs to the OAuth Client).*
+   - For Cloud Run: `https://<YOUR-CLOUD-RUN-URL>/auth/callback` and `https://<YOUR-CLOUD-RUN-URL>/connections/google/callback` (using the URL noted down in step 1).
 6. Click **Create**. Copy the generated **Client ID** and **Client Secret**.
+
+#### Update Terraform with your app_url:
+Once you have the Cloud Run service URL:
+1. Update `infra/terraform.tfvars` and set the `app_url` variable:
+   ```hcl
+   app_url = "https://<YOUR-CLOUD-RUN-URL>"
+   ```
+2. Run `terraform apply` again to propagate this URL to the container environment variables as `APP_GOOGLE_OAUTH_REDIRECT_URI`.
 
 #### How to Populate Secret Manager:
 1. Open **Secret Manager** in the GCP Console.
@@ -168,9 +176,8 @@ In your forked GitHub repository, navigate to **Settings** -> **Secrets and vari
 
 ### 5. Deploy
 
-Push any change to the `main` branch, or trigger the workflow manually under the **Actions** tab. The GitHub Actions runner will authenticate using Workload Identity Federation (WIF), build the Docker image, push it to Artifact Registry, and deploy/update the Cloud Run service.
+Push any change to the `main` branch, or trigger the workflow manually under the **Actions** tab. The GitHub Actions runner will authenticate using Workload Identity Federation (WIF), build the Docker image, push it to Artifact Registry, and update the Cloud Run service container image.
 
-Once deployed, the app will automatically configure its own `APP_GOOGLE_OAUTH_REDIRECT_URI` environment variable based on the Cloud Run URL.
 
 ### 6. Register Google Health Webhook Subscriber
 
