@@ -230,6 +230,14 @@ resource "google_cloud_run_v2_service" "app" {
         container_port = 8080
       }
 
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        startup_cpu_boost = true
+      }
+
       env {
         name  = "APP_GCP_PROJECT_ID"
         value = var.project_id
@@ -253,6 +261,11 @@ resource "google_cloud_run_v2_service" "app" {
           }
         }
       }
+    }
+
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 5
     }
   }
 
