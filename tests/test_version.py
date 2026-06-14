@@ -15,11 +15,6 @@ def test_get_app_version_fallback():
         assert get_app_version() == "0.1.0"
 
 
-def test_get_git_sha_from_env_app_version_sha():
-    with patch.dict(os.environ, {"APP_VERSION_SHA": "abcdef123456"}):
-        assert get_git_sha() == "abcdef1"
-
-
 def test_get_git_sha_from_env_git_sha():
     with patch.dict(os.environ, {"GIT_SHA": "1234567890"}):
         assert get_git_sha() == "1234567"

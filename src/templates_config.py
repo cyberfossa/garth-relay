@@ -28,7 +28,7 @@ def get_git_sha() -> str:
         The 7-character git SHA, or an empty string if not available.
     """
     # 1. Try to read from environment variable (injected during deployment)
-    env_sha = os.environ.get("APP_VERSION_SHA") or os.environ.get("GIT_SHA")
+    env_sha = os.environ.get("GIT_SHA")
     if env_sha:
         return env_sha[:7]
 
