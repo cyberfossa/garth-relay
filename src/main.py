@@ -6,6 +6,8 @@ from urllib.parse import urlparse
 
 import structlog
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.auth.google_oauth2 import GoogleOAuth2Config, GoogleOAuth2Service
 from src.config import get_config
@@ -70,6 +72,8 @@ def _create_app() -> FastAPI:  # noqa: PLR0915
         lifespan=lifespan,
     )
 
+    application.mount("/static", StaticFiles(directory="src/static"), name="static")
+
     # Middleware (order: security first, then CSRF)
     application.add_middleware(SecurityHeadersMiddleware)
     application.add_middleware(CSRFMiddleware)
@@ -77,6 +81,10 @@ def _create_app() -> FastAPI:  # noqa: PLR0915
     @application.get("/health")
     async def health_check():
         return {"status": "ok"}
+
+    @application.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        return FileResponse("src/static/favicon.png")
 
     # Pages router
     templates = create_templates()
