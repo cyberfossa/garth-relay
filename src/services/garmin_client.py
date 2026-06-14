@@ -1,8 +1,8 @@
 """Garmin Connect client wrapping garth-ng."""
 
 import asyncio
-from datetime import date, datetime
-from typing import cast
+from datetime import UTC, date, datetime
+from typing import Any, cast
 
 import garth
 import structlog
@@ -119,6 +119,95 @@ class GarminClient:
                 "Garmin weight fetch failed",
                 end_date=end_date.isoformat(),
                 days=days,
+                exc_info=True,
+            )
+            self._raise_mapped_http_error(exc)
+            raise
+
+    async def upload_blood_pressure(
+        self,
+        systolic: int,
+        diastolic: int,
+        pulse: int,
+        timestamp: datetime,
+        notes: str | None = None,
+    ) -> None:
+        try:
+            # Garmin expects measurementTimestampLocal (YYYY-MM-DDTHH:MM:SS.000) and measurementTimestampGMT (YYYY-MM-DDTHH:MM:SS.000)
+            # Normalize to UTC
+            if timestamp.tzinfo is None:
+                utc_dt = timestamp.replace(tzinfo=UTC)
+                local_dt = timestamp
+            else:
+                utc_dt = timestamp.astimezone(UTC)
+                local_dt = timestamp
+
+            for name, val, lo, hi in (
+                ("systolic", systolic, 70, 260),
+                ("diastolic", diastolic, 40, 150),
+                ("pulse", pulse, 20, 250),
+            ):
+                if not isinstance(val, int) or not (lo <= val <= hi):
+                    raise ValueError(f"{name} must be an int in [{lo}, {hi}]")
+
+            payload = {
+                "measurementTimestampLocal": local_dt.strftime("%Y-%m-%dT%H:%M:%S.000"),
+                "measurementTimestampGMT": utc_dt.strftime("%Y-%m-%dT%H:%M:%S.000"),
+                "systolic": systolic,
+                "diastolic": diastolic,
+                "pulse": pulse,
+                "sourceType": "MANUAL",
+                "notes": notes or "",
+            }
+
+            logger.info("Uploading blood pressure to Garmin", payload=payload)
+            await asyncio.to_thread(
+                self._client.connectapi,
+                "/bloodpressure-service/bloodpressure",
+                method="POST",
+                json=payload,
+            )
+        except GarthHTTPError as exc:
+            logger.warning(
+                "Garmin blood pressure upload failed",
+                systolic=systolic,
+                diastolic=diastolic,
+                pulse=pulse,
+                timestamp=timestamp.isoformat(),
+                exc_info=True,
+            )
+            self._raise_mapped_http_error(exc)
+            raise
+
+    async def fetch_existing_blood_pressures(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> list[dict[str, Any]]:
+        try:
+            logger.debug(
+                "Fetching existing blood pressures from Garmin",
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
+            )
+            path = f"/bloodpressure-service/bloodpressure/range/{start_date.isoformat()}/{end_date.isoformat()}"
+            response = await asyncio.to_thread(
+                self._client.connectapi,
+                path,
+                method="GET",
+            )
+            result: list[dict[str, Any]] = []
+            if isinstance(response, dict) and "measurementSummaries" in response:
+                for summary in response["measurementSummaries"]:
+                    for m in summary.get("measurements", []):
+                        result.append(m)
+            logger.debug("Fetched %d blood pressure records from Garmin", len(result))
+            return result
+        except GarthHTTPError as exc:
+            logger.warning(
+                "Garmin blood pressure fetch failed",
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
                 exc_info=True,
             )
             self._raise_mapped_http_error(exc)

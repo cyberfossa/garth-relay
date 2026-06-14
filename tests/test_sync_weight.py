@@ -51,7 +51,14 @@ def _measurement(
 @pytest.fixture
 def mock_db():
     db = MagicMock()
-    db.get_user_profile = Mock(return_value={"name": "Test User", "email": "test@example.com", "sync_enabled": True})
+    db.get_user_profile = Mock(
+        return_value={
+            "name": "Test User",
+            "email": "test@example.com",
+            "sync_enabled": True,
+            "omron_sync_enabled": False,
+        }
+    )
     db.get_oauth_token = Mock(return_value=_oauth_token())
     db.has_garmin_session = Mock(return_value=True)
     db.get_recent_syncs = Mock(return_value=[])

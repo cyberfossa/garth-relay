@@ -287,6 +287,93 @@ class FirestoreClient:
             logger.exception("Failed to delete OAuth token", user_id=user_id, provider=provider)
             return False
 
+    def update_user_omron_sync_enabled(self, user_id: str, enabled: bool) -> bool:
+        try:
+            self._user_ref(user_id).update({"omron_sync_enabled": enabled, "last_active": datetime.now(UTC)})
+            logger.info("Updated user omron_sync_enabled status", user_id=user_id, enabled=enabled)
+            return True
+        except Exception:
+            logger.exception("Failed to update user omron_sync_enabled status", user_id=user_id)
+            return False
+
+    def save_omron_tokens(
+        self,
+        user_id: str,
+        email: str,
+        access_token: str,
+        refresh_token: str,
+        expires_at: datetime,
+        region: str,
+        user_slot: int,
+        encryptor: Any,
+    ) -> bool:
+        try:
+            encrypted_access = encryptor.encrypt(access_token, aad=user_id)
+            encrypted_refresh = encryptor.encrypt(refresh_token, aad=user_id)
+            self._user_ref(user_id).collection("oauth_tokens").document("omron").set(
+                {
+                    "email": email,
+                    "access_token": encrypted_access,
+                    "refresh_token": encrypted_refresh,
+                    "expires_at": expires_at,
+                    "region": region,
+                    "user_slot": user_slot,
+                    "updated_at": datetime.now(UTC),
+                },
+                merge=True,
+            )
+            return True
+        except Exception:
+            logger.exception("Failed to save Omron tokens", user_id=user_id)
+            return False
+
+    def get_omron_tokens(self, user_id: str, encryptor: Any) -> dict[str, Any] | None:
+        try:
+            doc = cast(
+                firestore.DocumentSnapshot,
+                self._user_ref(user_id).collection("oauth_tokens").document("omron").get(),
+            )
+            if not doc.exists:
+                return None
+            data = cast(dict[str, Any], doc.to_dict() or {})
+
+            # Decrypt access and refresh tokens
+            access_token = encryptor.decrypt(data["access_token"], aad=user_id)
+            refresh_token = encryptor.decrypt(data["refresh_token"], aad=user_id)
+
+            return {
+                "email": data.get("email"),
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_at": data.get("expires_at"),
+                "region": data.get("region"),
+                "user_slot": data.get("user_slot", 1),
+                "updated_at": data.get("updated_at"),
+            }
+        except Exception:
+            logger.exception("Failed to get Omron tokens", user_id=user_id)
+            return None
+
+    def delete_omron_tokens(self, user_id: str) -> bool:
+        try:
+            self._user_ref(user_id).collection("oauth_tokens").document("omron").delete()
+            logger.info("Deleted Omron tokens", user_id=user_id)
+            return True
+        except Exception:
+            logger.exception("Failed to delete Omron tokens", user_id=user_id)
+            return False
+
+    def has_omron_connection(self, user_id: str) -> bool:
+        try:
+            doc = cast(
+                firestore.DocumentSnapshot,
+                self._user_ref(user_id).collection("oauth_tokens").document("omron").get(),
+            )
+            return doc.exists
+        except Exception:
+            logger.exception("Failed to check Omron connection", user_id=user_id)
+            return False
+
     def get_recent_poll_logs(self, limit: int = 10) -> list[dict[str, Any]]:
         try:
             docs = (
